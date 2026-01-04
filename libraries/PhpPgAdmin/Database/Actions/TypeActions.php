@@ -58,8 +58,9 @@ class TypeActions extends AbstractActions
         }
 
         $sql = "SELECT
-                t.typname AS basename,
-                pg_catalog.format_type(t.oid, NULL) AS typname,
+            t.oid,
+            t.typname AS basename,
+            pg_catalog.format_type(t.oid, NULL) AS typname,
                 pu.usename AS typowner,
                 t.typtype,
                 pg_catalog.obj_description(t.oid, 'pg_type') AS typcomment
@@ -290,68 +291,6 @@ class TypeActions extends AbstractActions
         }
         return $this->connection->endTransaction();
     }
-
-    /**
-     * Returns a list of all casts in the database,
-     * including a flag whether the cast is user-defined.
-     */
-    public function getCasts()
-    {
-        $conf = $this->conf();
-
-        if ($conf['show_system']) {
-            // No restriction, show all CASTs
-            $where = '';
-        } else {
-            // Only show CASTs with user-defined function:
-            // - castfunc != 0 (there is a function)
-            // - Function schema not pg_%
-            $where = <<<'SQL'
-            AND c.castfunc <> 0
-            AND n3.nspname NOT LIKE $$pg_%$$
-            SQL;
-        }
-
-        $sql = <<<"SQL"
-        SELECT
-            c.castsource::pg_catalog.regtype AS castsource,
-            c.casttarget::pg_catalog.regtype AS casttarget,
-            CASE WHEN c.castfunc = 0 THEN NULL
-                 ELSE c.castfunc::pg_catalog.regprocedure
-            END AS castfunc,
-            c.castcontext,
-            obj_description(c.oid, 'pg_cast') AS castcomment,
-
-            -- User cast, if function exists and is not in pg_catalog
-            CASE
-                WHEN c.castfunc = 0 THEN false
-                WHEN n3.nspname NOT LIKE 'pg_%' THEN true
-                ELSE false
-            END AS is_user_cast
-
-        FROM
-            pg_catalog.pg_cast c
-            LEFT JOIN pg_catalog.pg_proc p
-                ON c.castfunc = p.oid
-            LEFT JOIN pg_catalog.pg_namespace n3
-                ON p.pronamespace = n3.oid,
-            pg_catalog.pg_type t1,
-            pg_catalog.pg_type t2,
-            pg_catalog.pg_namespace n1,
-            pg_catalog.pg_namespace n2
-        WHERE
-            c.castsource = t1.oid
-            AND c.casttarget = t2.oid
-            AND t1.typnamespace = n1.oid
-            AND t2.typnamespace = n2.oid
-            {$where}
-        ORDER BY 1, 2
-        SQL;
-
-        return $this->connection->selectSet($sql);
-    }
-
-
 
     /**
      * Returns a list of all conversions in the database.

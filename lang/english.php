@@ -787,6 +787,22 @@ $lang['strimplicit'] = 'Implicit';
 $lang['strinassignment'] = 'In assignment';
 $lang['strbinarycompat'] = '(Binary compatible)';
 
+// Casts: create/drop
+$lang['strcreatecast'] = 'Create cast';
+$lang['strcastmethod'] = 'Cast method';
+$lang['strwithfunction'] = 'WITH FUNCTION';
+$lang['strwithoutfunction'] = 'WITHOUT FUNCTION';
+$lang['strwithinout'] = 'WITH INOUT';
+$lang['strcastcontext'] = 'Cast context';
+$lang['strexplicit'] = 'Explicit';
+$lang['strassignment'] = 'Assignment';
+$lang['strdropcast'] = 'Drop cast';
+$lang['strconfdropcast'] = 'Are you sure you want to drop cast %s?';
+$lang['strcastcreated'] = 'Cast created.';
+$lang['strcastcreatedbad'] = 'Cast could not be created.';
+$lang['strcastdropped'] = 'Cast dropped.';
+$lang['strcastdroppedbad'] = 'Cast could not be dropped.';
+
 // Conversions
 $lang['strconversions'] = 'Conversions';
 $lang['strnoconversions'] = 'No conversions found.';

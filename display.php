@@ -891,7 +891,7 @@ function doBrowse($msg = '')
 	*/
 	$status_line = format_string($lang['strbrowsestatistics'], [
 		'count' => is_object($rs) ? $rs->rowCount() : 0,
-		'first' => is_object($rs) ? $rowActions->lastQueryOffset + 1 : 0,
+		'first' => is_object($rs) && $rs->rowCount() > 0 ? $rowActions->lastQueryOffset + 1 : 0,
 		'last' => min($rowActions->totalRowsFound, $rowActions->lastQueryOffset + $rowActions->lastQueryLimit),
 		'total' => $rowActions->totalRowsFound,
 		'duration' => round($pg->lastQueryTime, 5),

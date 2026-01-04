@@ -36,7 +36,8 @@ function doSaveEdit()
 	} else {
 		$def = $_POST['formDefinition'];
 	}
-	if (!$functionActions->hasFunctionAlterSchema()) $_POST['formFuncSchema'] = '';
+	if (!$functionActions->hasFunctionAlterSchema())
+		$_POST['formFuncSchema'] = '';
 
 	$status = $functionActions->setFunction(
 		$_POST['function_oid'],
@@ -83,7 +84,7 @@ function doEdit($msg = '')
 	$functionActions = new SqlFunctionActions($pg);
 	$schemaActions = new SchemaActions($pg);
 	$roleActions = new RoleActions($pg);
-	
+
 	$misc->printTrail('function');
 	$misc->printTitle($lang['stralter'], 'pg.function.alter');
 	$misc->printMsg($msg);
@@ -94,18 +95,28 @@ function doEdit($msg = '')
 		$fndata->fields['proretset'] = $pg->phpBool($fndata->fields['proretset']);
 
 		// Initialise variables
-		if (!isset($_POST['formDefinition'])) $_POST['formDefinition'] = $fndata->fields['prosrc'];
-		if (!isset($_POST['formProperties'])) $_POST['formProperties'] = $functionActions->getFunctionProperties($fndata->fields);
-		if (!isset($_POST['formFunction'])) $_POST['formFunction'] = $fndata->fields['proname'];
-		if (!isset($_POST['formComment'])) $_POST['formComment'] = $fndata->fields['procomment'];
-		if (!isset($_POST['formObjectFile'])) $_POST['formObjectFile'] = $fndata->fields['probin'];
-		if (!isset($_POST['formLinkSymbol'])) $_POST['formLinkSymbol'] = $fndata->fields['prosrc'];
-		if (!isset($_POST['formFuncOwn'])) $_POST['formFuncOwn'] = $fndata->fields['proowner'];
-		if (!isset($_POST['formFuncSchema'])) $_POST['formFuncSchema'] = $fndata->fields['proschema'];
+		if (!isset($_POST['formDefinition']))
+			$_POST['formDefinition'] = $fndata->fields['prosrc'];
+		if (!isset($_POST['formProperties']))
+			$_POST['formProperties'] = $functionActions->getFunctionProperties($fndata->fields);
+		if (!isset($_POST['formFunction']))
+			$_POST['formFunction'] = $fndata->fields['proname'];
+		if (!isset($_POST['formComment']))
+			$_POST['formComment'] = $fndata->fields['procomment'];
+		if (!isset($_POST['formObjectFile']))
+			$_POST['formObjectFile'] = $fndata->fields['probin'];
+		if (!isset($_POST['formLinkSymbol']))
+			$_POST['formLinkSymbol'] = $fndata->fields['prosrc'];
+		if (!isset($_POST['formFuncOwn']))
+			$_POST['formFuncOwn'] = $fndata->fields['proowner'];
+		if (!isset($_POST['formFuncSchema']))
+			$_POST['formFuncSchema'] = $fndata->fields['proschema'];
 
 		if ($functionActions->hasFunctionCosting()) {
-			if (!isset($_POST['formCost'])) $_POST['formCost'] = $fndata->fields['procost'];
-			if (!isset($_POST['formRows'])) $_POST['formRows'] = $fndata->fields['prorows'];
+			if (!isset($_POST['formCost']))
+				$_POST['formCost'] = $fndata->fields['procost'];
+			if (!isset($_POST['formRows']))
+				$_POST['formRows'] = $fndata->fields['prorows'];
 		}
 
 		// Deal with named parameters
@@ -120,7 +131,8 @@ function doEdit($msg = '')
 			$args = '';
 			$i = 0;
 			for ($i = 0; $i < sizeof($args_arr); $i++) {
-				if ($i != 0) $args .= ', ';
+				if ($i != 0)
+					$args .= ', ';
 				if (isset($modes_arr[$i])) {
 					switch ($modes_arr[$i]) {
 						case 'i':
@@ -173,7 +185,8 @@ function doEdit($msg = '')
 				$schemas->moveNext();
 			}
 			echo "</select>\n";
-		} else echo $fndata->fields['proschema'];
+		} else
+			echo $fndata->fields['proschema'];
 		echo "</td>\n";
 		echo "<td class=\"data1\">";
 		echo "<input type=\"hidden\" name=\"original_function\" value=\"", htmlspecialchars($fndata->fields['proname']), "\" />\n";
@@ -185,7 +198,8 @@ function doEdit($msg = '')
 		echo "</td>\n";
 
 		echo "<td class=\"data1\">";
-		if ($fndata->fields['proretset']) echo "setof ";
+		if ($fndata->fields['proretset'])
+			echo "setof ";
 		echo $misc->printVal($fndata->fields['proresult']), "\n";
 		echo "<input type=\"hidden\" name=\"original_returns\" value=\"", html_esc($fndata->fields['proresult']), "\" />\n";
 		if ($fndata->fields['proretset'])
@@ -202,24 +216,24 @@ function doEdit($msg = '')
 			echo "<tr><th class=\"data required\" colspan=\"2\">{$lang['strobjectfile']}</th>\n";
 			echo "<th class=\"data\" colspan=\"2\">{$lang['strlinksymbol']}</th></tr>\n";
 			echo "<tr><td class=\"data1\" colspan=\"2\"><input type=\"text\" name=\"formObjectFile\" style=\"width:100%\" value=\"",
-			html_esc($_POST['formObjectFile']), "\" /></td>\n";
+				html_esc($_POST['formObjectFile']), "\" /></td>\n";
 			echo "<td class=\"data1\" colspan=\"2\"><input type=\"text\" name=\"formLinkSymbol\" style=\"width:100%\" value=\"",
-			html_esc($_POST['formLinkSymbol']), "\" /></td></tr>\n";
+				html_esc($_POST['formLinkSymbol']), "\" /></td></tr>\n";
 		} else if ($fnlang == 'internal') {
 			echo "<tr><th class=\"data\" colspan=\"5\">{$lang['strlinksymbol']}</th></tr>\n";
 			echo "<tr><td class=\"data1\" colspan=\"5\"><input type=\"text\" name=\"formLinkSymbol\" style=\"width:100%\" value=\"",
-			html_esc($_POST['formLinkSymbol']), "\" /></td></tr>\n";
+				html_esc($_POST['formLinkSymbol']), "\" /></td></tr>\n";
 		} else {
 			$mode = htmlspecialchars($fndata->fields['prolanguage']);
 			echo "<tr><th class=\"data required\" colspan=\"5\">{$lang['strdefinition']}</th></tr>\n";
 			echo "<tr><td class=\"data1\" colspan=\"5\"><textarea style=\"width:100%;\" rows=\"20\" cols=\"50\" name=\"formDefinition\" class=\"sql-editor frame resizable big\" data-mode=\"$mode\">",
-			html_esc($_POST['formDefinition']), "</textarea></td></tr>\n";
+				html_esc($_POST['formDefinition']), "</textarea></td></tr>\n";
 		}
 
 		// Display function comment
 		echo "<tr><th class=\"data\" colspan=\"5\">{$lang['strcomment']}</th></tr>\n";
 		echo "<tr><td class=\"data1\" colspan=\"5\"><textarea style=\"width:100%;\" name=\"formComment\" rows=\"3\" cols=\"50\">",
-		html_esc($_POST['formComment']), "</textarea></td></tr>\n";
+			html_esc($_POST['formComment']), "</textarea></td></tr>\n";
 
 		// Display function cost options
 		if ($functionActions->hasFunctionCosting()) {
@@ -227,7 +241,7 @@ function doEdit($msg = '')
 			echo "<td class=\"data1\" colspan=\"2\">{$lang['strexecutioncost']}: <input name=\"formCost\" size=\"16\" value=\"" .
 				html_esc($_POST['formCost']) . "\" /></td>";
 			echo "<td class=\"data1\" colspan=\"2\">{$lang['strresultrows']}: <input name=\"formRows\" size=\"16\" value=\"",
-			html_esc($_POST['formRows']), "\"", (!$fndata->fields['proretset']) ? 'disabled' : '', "/></td>";
+				html_esc($_POST['formRows']), "\"", (!$fndata->fields['proretset']) ? 'disabled' : '', "/></td>";
 		}
 
 		// Display function properties
@@ -239,7 +253,7 @@ function doEdit($msg = '')
 				echo "<select name=\"formProperties[{$i}]\">\n";
 				foreach ($v as $p) {
 					echo "<option value=\"", htmlspecialchars($p), "\"", ($p == $_POST['formProperties'][$i]) ? ' selected="selected"' : '',
-					">", $misc->printVal($p), "</option>\n";
+						">", $misc->printVal($p), "</option>\n";
 				}
 				echo "</select><br />\n";
 				$i++;
@@ -268,7 +282,8 @@ function doEdit($msg = '')
 		echo "<input type=\"submit\" value=\"{$lang['stralter']}\" />\n";
 		echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" /></p>\n";
 		echo "</form>\n";
-	} else echo "<p class=\"empty\">{$lang['strnodata']}</p>\n";
+	} else
+		echo "<p class=\"empty\">{$lang['strnodata']}</p>\n";
 }
 
 /**
@@ -301,7 +316,8 @@ function doProperties($msg = '')
 			$args = '';
 			$i = 0;
 			for ($i = 0; $i < sizeof($args_arr); $i++) {
-				if ($i != 0) $args .= ', ';
+				if ($i != 0)
+					$args .= ', ';
 				if (isset($modes_arr[$i])) {
 					switch ($modes_arr[$i]) {
 						case 'i':
@@ -345,7 +361,8 @@ function doProperties($msg = '')
 		echo "<tr><td class=\"data1\">", $misc->printVal($funcdata->fields['proname']), "</td>\n";
 		echo "<td class=\"data1\">", $misc->printVal($args), "</td>\n";
 		echo "<td class=\"data1\">";
-		if ($funcdata->fields['proretset']) echo "setof ";
+		if ($funcdata->fields['proretset'])
+			echo "setof ";
 		echo $misc->printVal($funcdata->fields['proresult']), "</td>\n";
 		echo "<td class=\"data1\">", $misc->printVal($funcdata->fields['prolanguage']), "</td></tr>\n";
 
@@ -386,7 +403,8 @@ function doProperties($msg = '')
 		echo "<tr><th class=\"data\" colspan=\"4\">{$lang['strowner']}</th></tr>\n";
 		echo "<tr><td class=\"data1\" colspan=\"4\">", html_esc($funcdata->fields['proowner']), "</td></tr>\n";
 		echo "</table>\n";
-	} else echo "<p>{$lang['strnodata']}</p>\n";
+	} else
+		echo "<p>{$lang['strnodata']}</p>\n";
 
 	$navlinks = [
 		'showall' => [
@@ -504,7 +522,8 @@ function doDrop($confirm)
 				// Everything went fine, back to the Default page....
 				AppContainer::setShouldReloadTree(true);
 				doDefault($msg);
-			} else doDefault($lang['strfunctiondroppedbad']);
+			} else
+				doDefault($lang['strfunctiondroppedbad']);
 		} else {
 			$status = $functionActions->dropFunction($_POST['function_oid'], isset($_POST['cascade']));
 			if ($status == 0) {
@@ -531,19 +550,32 @@ function doCreate($msg = '', $szJS = "")
 	$languageActions = new LanguageActions($pg);
 
 	$misc->printTrail('schema');
-	if (!isset($_POST['formFunction'])) $_POST['formFunction'] = '';
-	if (!isset($_POST['formArguments'])) $_POST['formArguments'] = '';
-	if (!isset($_POST['formReturns'])) $_POST['formReturns'] = '';
-	if (!isset($_POST['formLanguage'])) $_POST['formLanguage'] = $_REQUEST['language'] ?? 'sql';
-	if (!isset($_POST['formDefinition'])) $_POST['formDefinition'] = '';
-	if (!isset($_POST['formObjectFile'])) $_POST['formObjectFile'] = '';
-	if (!isset($_POST['formLinkSymbol'])) $_POST['formLinkSymbol'] = '';
-	if (!isset($_POST['formProperties'])) $_POST['formProperties'] = $pg->defaultprops;
-	if (!isset($_POST['formSetOf'])) $_POST['formSetOf'] = '';
-	if (!isset($_POST['formArray'])) $_POST['formArray'] = '';
-	if (!isset($_POST['formCost'])) $_POST['formCost'] = '';
-	if (!isset($_POST['formRows'])) $_POST['formRows'] = '';
-	if (!isset($_POST['formComment'])) $_POST['formComment'] = '';
+	if (!isset($_POST['formFunction']))
+		$_POST['formFunction'] = '';
+	if (!isset($_POST['formArguments']))
+		$_POST['formArguments'] = '';
+	if (!isset($_POST['formReturns']))
+		$_POST['formReturns'] = '';
+	if (!isset($_POST['formLanguage']))
+		$_POST['formLanguage'] = $_REQUEST['language'] ?? 'sql';
+	if (!isset($_POST['formDefinition']))
+		$_POST['formDefinition'] = '';
+	if (!isset($_POST['formObjectFile']))
+		$_POST['formObjectFile'] = '';
+	if (!isset($_POST['formLinkSymbol']))
+		$_POST['formLinkSymbol'] = '';
+	if (!isset($_POST['formProperties']))
+		$_POST['formProperties'] = $pg->defaultprops;
+	if (!isset($_POST['formSetOf']))
+		$_POST['formSetOf'] = '';
+	if (!isset($_POST['formArray']))
+		$_POST['formArray'] = '';
+	if (!isset($_POST['formCost']))
+		$_POST['formCost'] = '';
+	if (!isset($_POST['formRows']))
+		$_POST['formRows'] = '';
+	if (!isset($_POST['formComment']))
+		$_POST['formComment'] = '';
 
 	$types = $typeActions->getTypes(true, true, true);
 	$langs = $languageActions->getLanguages(true);
@@ -692,23 +724,23 @@ function doCreate($msg = '', $szJS = "")
 		echo "<tr><th class=\"data required\" colspan=\"2\">{$lang['strobjectfile']}</th>\n";
 		echo "<th class=\"data\" colspan=\"2\">{$lang['strlinksymbol']}</th></tr>\n";
 		echo "<tr><td class=\"data1\" colspan=\"2\"><input type=\"text\" name=\"formObjectFile\" style=\"width:100%\" value=\"",
-		html_esc($_POST['formObjectFile']), "\" /></td>\n";
+			html_esc($_POST['formObjectFile']), "\" /></td>\n";
 		echo "<td class=\"data1\" colspan=\"2\"><input type=\"text\" name=\"formLinkSymbol\" style=\"width:100%\" value=\"",
-		html_esc($_POST['formLinkSymbol']), "\" /></td></tr>\n";
+			html_esc($_POST['formLinkSymbol']), "\" /></td></tr>\n";
 	} else if ($fnlang == 'internal') {
 		echo "<tr><th class=\"data\" colspan=\"4\">{$lang['strlinksymbol']}</th></tr>\n";
 		echo "<tr><td class=\"data1\" colspan=\"4\"><input type=\"text\" name=\"formLinkSymbol\" style=\"width:100%\" value=\"",
-		html_esc($_POST['formLinkSymbol']), "\" /></td></tr>\n";
+			html_esc($_POST['formLinkSymbol']), "\" /></td></tr>\n";
 	} else {
 		echo "<tr><th class=\"data required\" colspan=\"4\">{$lang['strdefinition']}</th></tr>\n";
 		echo "<tr><td class=\"data1\" colspan=\"4\"><textarea style=\"width:100%;\" rows=\"20\" cols=\"50\" name=\"formDefinition\" class=\"sql-editor frame resizable big\" data-mode=\"plpgsql\">",
-		html_esc($_POST['formDefinition']), "</textarea></td></tr>\n";
+			html_esc($_POST['formDefinition']), "</textarea></td></tr>\n";
 	}
 
 	// Display function comment
 	echo "<tr><th class=\"data\" colspan=\"4\">{$lang['strcomment']}</th></tr>\n";
 	echo "<tr><td class=\"data1\" colspan=\"4\"><textarea style=\"width:100%;\" name=\"formComment\" rows=\"3\" cols=\"50\">",
-	html_esc($_POST['formComment']), "</textarea></td></tr>\n";
+		html_esc($_POST['formComment']), "</textarea></td></tr>\n";
 
 	// Display function cost options
 	if ($functionActions->hasFunctionCosting()) {
@@ -728,7 +760,7 @@ function doCreate($msg = '', $szJS = "")
 			echo "<select name=\"formProperties[{$i}]\">\n";
 			foreach ($v as $p) {
 				echo "<option value=\"", html_esc($p), "\"", ($p == $_POST['formProperties'][$i]) ? ' selected="selected"' : '',
-				">", $misc->printVal($p), "</option>\n";
+					">", $misc->printVal($p), "</option>\n";
 			}
 			echo "</select><br />\n";
 			$i++;
@@ -775,18 +807,20 @@ function doSaveCreate()
 	}
 
 	$cost = (isset($_POST['formCost'])) ? $_POST['formCost'] : null;
-	if ($cost == '' || !is_numeric($cost) || $cost != (int)$cost || $cost < 0) {
+	if ($cost == '' || !is_numeric($cost) || $cost != (int) $cost || $cost < 0) {
 		$cost = null;
 	}
 
 	$rows = (isset($_POST['formRows'])) ? $_POST['formRows'] : null;
-	if ($rows == '' || !is_numeric($rows) || $rows != (int)$rows) {
+	if ($rows == '' || !is_numeric($rows) || $rows != (int) $rows) {
 		$rows = null;
 	}
 
 	// Check that they've given a name and a definition
-	if ($_POST['formFunction'] == '') doCreate($lang['strfunctionneedsname'], $szJS);
-	elseif ($fnlang != 'internal' && !$def) doCreate($lang['strfunctionneedsdef'], $szJS);
+	if ($_POST['formFunction'] == '')
+		doCreate($lang['strfunctionneedsname'], $szJS);
+	elseif ($fnlang != 'internal' && !$def)
+		doCreate($lang['strfunctionneedsdef'], $szJS);
 	else {
 		// Append array symbol to type if chosen
 		$status = $functionActions->createFunction(
@@ -906,6 +940,7 @@ function doDefault($msg = '')
 			'field' => field('proproto'),
 			'url' => "redirect.php?subject=function&amp;action=properties&amp;{$misc->href}&amp;",
 			'vars' => ['function' => 'proproto', 'function_oid' => 'prooid'],
+			'icon' => $misc->icon('Function'),
 		],
 		'returns' => [
 			'title' => $lang['strreturns'],
@@ -1072,7 +1107,8 @@ function doTree()
 $action = $_REQUEST['action'] ?? '';
 //if (!isset($msg)) $msg = '';
 
-if ($action == 'tree') doTree();
+if ($action == 'tree')
+	doTree();
 
 $misc = AppContainer::getMisc();
 $lang = AppContainer::getLang();
@@ -1082,22 +1118,28 @@ $misc->printBody();
 
 switch ($action) {
 	case 'save_create':
-		if (isset($_POST['cancel'])) doDefault();
-		else doSaveCreate();
+		if (isset($_POST['cancel']))
+			doDefault();
+		else
+			doSaveCreate();
 		break;
 	case 'create':
 		doCreate();
 		break;
 	case 'drop':
-		if (isset($_POST['drop'])) doDrop(false);
-		else doDefault();
+		if (isset($_POST['drop']))
+			doDrop(false);
+		else
+			doDefault();
 		break;
 	case 'confirm_drop':
 		doDrop(true);
 		break;
 	case 'save_edit':
-		if (isset($_POST['cancel'])) doDefault();
-		else doSaveEdit();
+		if (isset($_POST['cancel']))
+			doDefault();
+		else
+			doSaveEdit();
 		break;
 	case 'edit':
 		doEdit();

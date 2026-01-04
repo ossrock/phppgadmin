@@ -151,6 +151,7 @@ class RowActions extends AbstractActions
 
 		// Count the number of rows
 		$total = (int) $this->connection->selectField($count, 'total');
+
 		if ($total < 0) {
 			$this->connection->rollbackTransaction();
 			return -2;
@@ -158,7 +159,7 @@ class RowActions extends AbstractActions
 		$this->totalRowsFound = $total;
 
 		// Calculate max pages
-		$max_pages = ceil($total / $page_size);
+		$max_pages = max(1, ceil($total / $page_size));
 
 		// Check that page is less than or equal to max pages
 		if (!is_numeric($page) || $page != (int) $page || $page > $max_pages || $page < 1) {
@@ -169,8 +170,7 @@ class RowActions extends AbstractActions
 		skip_count:
 
 		// Set fetch mode to NUM so that duplicate field names are properly returned
-		// for non-table queries.  Since the SELECT feature only allows selecting one
-		// table, duplicate fields shouldn't appear.
+		// for non-table queries.  !Disabled for now.
 		if ($type == 'QUERY')
 			$this->connection->conn->setFetchMode(ADODB_FETCH_NUM);
 
