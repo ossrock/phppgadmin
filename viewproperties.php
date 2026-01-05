@@ -1,12 +1,13 @@
 <?php
 
-use PhpPgAdmin\Core\AppContainer;
-use PhpPgAdmin\Database\Actions\ColumnActions;
-use PhpPgAdmin\Database\Actions\RoleActions;
-use PhpPgAdmin\Database\Actions\SchemaActions;
-use PhpPgAdmin\Database\Actions\TableActions;
-use PhpPgAdmin\Database\Actions\ViewActions;
 use PhpPgAdmin\Gui\DumpRenderer;
+use PhpPgAdmin\Core\AppContainer;
+use PhpPgAdmin\Gui\QueryExportRenderer;
+use PhpPgAdmin\Database\Actions\RoleActions;
+use PhpPgAdmin\Database\Actions\ViewActions;
+use PhpPgAdmin\Database\Actions\TableActions;
+use PhpPgAdmin\Database\Actions\ColumnActions;
+use PhpPgAdmin\Database\Actions\SchemaActions;
 
 /**
  * List views in a database
@@ -85,15 +86,20 @@ function doEdit($msg = '')
 function doExport($msg = '')
 {
 	$misc = AppContainer::getMisc();
-	$lang = AppContainer::getLang();
+	$pg = AppContainer::getPostgres();
 
 	$misc->printTrail('view');
 	$misc->printTabs('view', 'export');
 	$misc->printMsg($msg);
 
-	// Use the unified DumpRenderer for the export form
-	$dumpRenderer = new \PhpPgAdmin\Gui\DumpRenderer();
-	$dumpRenderer->renderExportForm('view', []);
+	$schema = $pg->escapeIdentifier($_REQUEST['schema']);
+	$view = $pg->escapeIdentifier($_REQUEST['view']);
+	$query = "SELECT * FROM {$schema}.{$view}";
+	$queryExportRenderer = new QueryExportRenderer();
+	$queryExportRenderer->renderExportForm($query, [
+		'subject' => 'view',
+		'view' => $_REQUEST['view'],
+	]);
 }
 
 /**

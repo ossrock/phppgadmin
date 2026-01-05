@@ -4,7 +4,8 @@ namespace PhpPgAdmin\Gui;
 
 use PhpPgAdmin\Core\AbstractContext;
 
-class FormRenderer extends AbstractContext {
+class FormRenderer extends AbstractContext
+{
 
 	/**
 	 * Prints a combox box
@@ -16,7 +17,8 @@ class FormRenderer extends AbstractContext {
 	 * @param int (optional) $iSize int to specify the size IF a multi select combo
 	 * @return string with the generated HTML select box
 	 */
-	function printCombo(&$arrOptions, $szName, $bBlankEntry = true, $szDefault = '', $bMultiple = false, $iSize = 10) {
+	function printCombo(&$arrOptions, $szName, $bBlankEntry = true, $szDefault = '', $bMultiple = false, $iSize = 10)
+	{
 		$htmlOut = '';
 		if ($bMultiple) // If multiple select combo
 			$htmlOut .= "<select name=\"$szName\" id=\"$szName\" multiple=\"multiple\" size=\"$iSize\">\n";
@@ -46,7 +48,8 @@ class FormRenderer extends AbstractContext {
 	 * @param string $type The database type of the field
 	 * @param array $extras An array of attributes name as key and attributes' values as value
 	 */
-	function printField($name, $value, $type, $extras = []) {
+	function printField($name, $value, $type, $extras = [])
+	{
 		global $lang;
 
 		if (!isset($value)) {
@@ -70,59 +73,62 @@ class FormRenderer extends AbstractContext {
 		//var_dump($type);
 
 		switch ($base_type) {
-		case 'bool':
-		case 'boolean':
-			if ($value == '') $value = null;
-			elseif ($value == 'true') $value = 't';
-			elseif ($value == 'false') $value = 'f';
+			case 'bool':
+			case 'boolean':
+				if ($value == '')
+					$value = null;
+				elseif ($value == 'true')
+					$value = 't';
+				elseif ($value == 'false')
+					$value = 'f';
 
-			// If value is null, 't' or 'f'...
-			if ($value === null || $value == 't' || $value == 'f') {
-				/*
-				echo "<select name=\"", htmlspecialchars($name), "\"{$extra_str}>\n";
-				echo "<option value=\"\"", ($value === null) ? ' selected="selected"' : '', "></option>\n";
-				echo "<option value=\"t\"", ($value == 't') ? ' selected="selected"' : '', ">{$lang['strtrue']}</option>\n";
-				echo "<option value=\"f\"", ($value == 'f') ? ' selected="selected"' : '', ">{$lang['strfalse']}</option>\n";
-				echo "</select>\n";
-				*/
-				$input_name = htmlspecialchars($name);
-				echo "<label><input type=\"radio\" name=\"$input_name\" value=\"\"", ($value == null) ? " checked" : "", "> {$lang['strnull']}</label>&nbsp;&nbsp;&nbsp;";
-				echo "<label><input type=\"radio\" name=\"$input_name\" value=\"t\"", ($value == 't') ? " checked" : "", "> {$lang['strtrue']}</label>&nbsp;&nbsp;&nbsp;";
-				echo "<label><input type=\"radio\" name=\"$input_name\" value=\"f\"", ($value == 'f') ? " checked" : "", "> {$lang['strfalse']}</label>";
-			} else {
+				// If value is null, 't' or 'f'...
+				if ($value === null || $value == 't' || $value == 'f') {
+					/*
+					echo "<select name=\"", htmlspecialchars($name), "\"{$extra_str}>\n";
+					echo "<option value=\"\"", ($value === null) ? ' selected="selected"' : '', "></option>\n";
+					echo "<option value=\"t\"", ($value == 't') ? ' selected="selected"' : '', ">{$lang['strtrue']}</option>\n";
+					echo "<option value=\"f\"", ($value == 'f') ? ' selected="selected"' : '', ">{$lang['strfalse']}</option>\n";
+					echo "</select>\n";
+					*/
+					$input_name = htmlspecialchars($name);
+					echo "<label><input type=\"radio\" name=\"$input_name\" value=\"\"", ($value == null) ? " checked" : "", "$extra_str> {$lang['strnull']}</label>&nbsp;&nbsp;&nbsp;";
+					echo "<label><input type=\"radio\" name=\"$input_name\" value=\"t\"", ($value == 't') ? " checked" : "", "$extra_str> {$lang['strtrue']}</label>&nbsp;&nbsp;&nbsp;";
+					echo "<label><input type=\"radio\" name=\"$input_name\" value=\"f\"", ($value == 'f') ? " checked" : "", "$extra_str> {$lang['strfalse']}</label>";
+				} else {
+					echo "<input name=\"", htmlspecialchars($name), "\" value=\"", htmlspecialchars($value ?? ''), "\" size=\"35\"{$extra_str} />\n";
+				}
+				break;
+			case 'bytea':
+			case 'bytea[]':
+				if (!is_null($value)) {
+					$value = '\x' . strtoupper(bin2hex($value));
+				}
+			case 'text':
+			case 'text[]':
+			case 'json':
+			case 'jsonb':
+			case 'xml':
+			case 'xml[]':
+				$n = substr_count($value ?? '', "\n");
+				$n = $n < 5 ? 5 : $n;
+				$n = $n > 20 ? 20 : $n;
+				echo "<textarea name=\"", htmlspecialchars($name), "\" rows=\"{$n}\" cols=\"75\"{$extra_str}>\n";
+				echo htmlspecialchars($value ?? '');
+				echo "</textarea>\n";
+				break;
+			case 'character':
+			case 'character[]':
+				$n = substr_count($value, "\n");
+				$n = $n < 5 ? 5 : $n;
+				$n = $n > 20 ? 20 : $n;
+				echo "<textarea name=\"", htmlspecialchars($name), "\" rows=\"{$n}\" cols=\"35\"{$extra_str}>\n";
+				echo htmlspecialchars($value ?? '');
+				echo "</textarea>\n";
+				break;
+			default:
 				echo "<input name=\"", htmlspecialchars($name), "\" value=\"", htmlspecialchars($value ?? ''), "\" size=\"35\"{$extra_str} />\n";
-			}
-			break;
-		case 'bytea':
-		case 'bytea[]':
-			if (!is_null($value)) {
-				$value = $this->postgres()->escapeBytea($value);
-			}
-		case 'text':
-		case 'text[]':
-		case 'json':
-		case 'jsonb':
-		case 'xml':
-		case 'xml[]':
-			$n = substr_count($value ?? '', "\n");
-			$n = $n < 5 ? 5 : $n;
-			$n = $n > 20 ? 20 : $n;
-			echo "<textarea name=\"", htmlspecialchars($name), "\" rows=\"{$n}\" cols=\"75\"{$extra_str}>\n";
-			echo htmlspecialchars($value ?? '');
-			echo "</textarea>\n";
-			break;
-		case 'character':
-		case 'character[]':
-			$n = substr_count($value, "\n");
-			$n = $n < 5 ? 5 : $n;
-			$n = $n > 20 ? 20 : $n;
-			echo "<textarea name=\"", htmlspecialchars($name), "\" rows=\"{$n}\" cols=\"35\"{$extra_str}>\n";
-			echo htmlspecialchars($value ?? '');
-			echo "</textarea>\n";
-			break;
-		default:
-			echo "<input name=\"", htmlspecialchars($name), "\" value=\"", htmlspecialchars($value ?? ''), "\" size=\"35\"{$extra_str} />\n";
-			break;
+				break;
 		}
 	}
 

@@ -2,6 +2,8 @@
 
 namespace PhpPgAdmin\Database\Export;
 
+use PhpPgAdmin\Core\AppContainer;
+
 /**
  * SQL Format Formatter
  * Outputs PostgreSQL SQL statements as-is or slightly processed
@@ -15,107 +17,183 @@ class SqlFormatter extends OutputFormatter
     /** @var bool */
     protected $supportsGzip = true;
 
+    private const ESCAPE_MODE_NONE = 0;
+    private const ESCAPE_MODE_STRING = 1;
+    private const ESCAPE_MODE_BYTEA = 2;
+
     /**
      * Format ADORecordSet as SQL INSERT statements
-     * @param mixed $recordset ADORecordSet
+     * @param \ADORecordSet $recordset ADORecordSet
      * @param array $metadata with keys: table, columns, insert_format
-     * @return string
      */
     public function format($recordset, $metadata = [])
     {
+        $pg = AppContainer::getPostgres();
         $table_name = $metadata['table'] ?? 'data';
         $insert_format = $metadata['insert_format'] ?? 'multi'; // multi, single, or copy
-        $output = '';
 
         if (!$recordset || $recordset->EOF) {
-            return '';
+            return;
         }
 
         // Get column information
         $columns = [];
+        $escape_mode = []; // 0 = none, 1 = literal, 2 = bytea
         for ($i = 0; $i < count($recordset->fields); $i++) {
             $finfo = $recordset->fetchField($i);
-            $columns[] = $finfo->name ?? "column_$i";
+            $name = $finfo->name ?? "column_$i";
+            $columns[$i] = $name;
+            $type = strtolower($finfo->type ?? '');
+
+            // numeric types → no escaping
+            if (
+                isset([
+                    'int2' => true,
+                    'int4' => true,
+                    'int8' => true,
+                    'integer' => true,
+                    'bigint' => true,
+                    'smallint' => true,
+                    'float4' => true,
+                    'float8' => true,
+                    'real' => true,
+                    'double precision' => true,
+                    'numeric' => true,
+                    'decimal' => true
+                ][$type])
+            ) {
+                $escape_mode[$i] = self::ESCAPE_MODE_NONE;
+                continue;
+            }
+
+            // boolean → no escaping
+            if ($type === 'bool' || $type === 'boolean') {
+                $escape_mode[$i] = self::ESCAPE_MODE_NONE;
+                continue;
+            }
+
+            // bytea → escapeBytea
+            if ($type === 'bytea') {
+                $escape_mode[$i] = self::ESCAPE_MODE_BYTEA;
+                continue;
+            }
+
+            // anything else → escapeLiteral
+            $escape_mode[$i] = self::ESCAPE_MODE_STRING;
         }
 
-        // Helper to escape SQL identifiers (field names, table names)
-        $escapeIdentifier = function ($name) {
-            return '"' . str_replace('"', '""', $name) . '"';
-        };
 
         if ($insert_format === 'copy') {
             // COPY format
-            $line = "COPY " . $escapeIdentifier($table_name) . " (" . implode(', ', array_map($escapeIdentifier, $columns)) . ") FROM stdin;\n";
-            $output .= $this->write($line);
+            $line = "COPY " . $pg->escapeIdentifier($table_name) . " (" . implode(', ', array_map([$pg, 'escapeIdentifier'], $columns)) . ") FROM stdin;\n";
+            $this->write($line);
 
             while (!$recordset->EOF) {
                 $first = true;
                 $line = '';
-                foreach ($recordset->fields as $v) {
-                    $v = $this->escapeBytea($v);
-                    if (!is_null($v)) {
-                        $v = preg_replace('/\\\\([0-7]{3})/', '\\\\\1', $v);
+                foreach ($recordset->fields as $i => $v) {
+                    if ($v !== null) {
+                        if ($escape_mode[$i] === self::ESCAPE_MODE_BYTEA) {
+                            // COPY bytea escaping
+                            $v = bytea_to_octal($v);
+                        } else {
+                            // COPY escaping: backslash and non-printable chars
+                            $v = addcslashes($v, "\0\\\n\r\t");
+                            $v = preg_replace('/\\\\([0-7]{3})/', '\\\\\1', $v);
+                        }
                     }
                     if ($first) {
-                        $line .= (is_null($v)) ? '\\N' : $v;
+                        $line .= ($v === null) ? '\\N' : $v;
                         $first = false;
                     } else {
-                        $line .= "\t" . ((is_null($v)) ? '\\N' : $v);
+                        $line .= "\t" . (($v === null) ? '\\N' : $v);
                     }
                 }
                 $line .= "\n";
-                $output .= $this->write($line);
+                $this->write($line);
                 $recordset->moveNext();
             }
-            $output .= $this->write("\\.\n");
+            $this->write("\\.\n");
         } else {
             // Standard INSERT statements (multi or single)
-            $rows_for_batch = ($insert_format === 'multi') ? [] : [];
+            $batch_size = $metadata['batch_size'] ?? 100; // for multi-row inserts
+            $is_multi = ($insert_format === 'multi');
+            $rows_in_batch = 0;
+            $insert_begin = $line = "INSERT INTO " . $pg->escapeIdentifier($table_name) . " (" . implode(', ', array_map([$pg, 'escapeIdentifier'], $columns)) . ") VALUES";
 
             while (!$recordset->EOF) {
-                $values = [];
-                foreach ($recordset->fields as $v) {
-                    if (is_null($v)) {
-                        $values[] = 'NULL';
+
+                $values = "(";
+                $sep = "";
+                foreach ($recordset->fields as $i => $v) {
+                    $values .= $sep;
+                    $sep = ",";
+                    if ($v === null) {
+                        $values .= "NULL";
+                    } elseif ($escape_mode[$i] === self::ESCAPE_MODE_STRING) {
+                        $values .= $pg->escapeLiteral($v);
+                    } elseif ($escape_mode[$i] === self::ESCAPE_MODE_BYTEA) {
+                        $values .= "'" . $pg->escapeBytea($v) . "'";
                     } else {
-                        $v = addCSlashes($v, "\0..\37\177..\377");
-                        $v = preg_replace('/\\\\([0-7]{3})/', '\\\1', $v);
-                        $v = str_replace("'", "''", $v);
-                        $values[] = "'" . $v . "'";
+                        $values .= $v;
                     }
                 }
+                $values .= ")";
 
-                if ($insert_format === 'single') {
-                    $line = "INSERT INTO " . $escapeIdentifier($table_name) . " (" . implode(', ', array_map($escapeIdentifier, $columns)) . ") VALUES (" . implode(', ', $values) . ");\n";
-                    $output .= $this->write($line);
+                if ($is_multi) {
+                    if ($rows_in_batch === 0) {
+                        $this->write("$insert_begin\n");
+                    } elseif ($rows_in_batch >= $batch_size) {
+                        $this->write(";\n\n$insert_begin\n");
+                        $rows_in_batch = 0;
+                    } else {
+                        $this->write(",\n");
+                    }
+                    $this->write($values);
+                    $rows_in_batch++;
                 } else {
-                    // multi: collect rows for batch INSERT
-                    $rows_for_batch[] = "(" . implode(', ', $values) . ")";
+                    $this->write("$insert_begin $values;\n");
                 }
 
                 $recordset->moveNext();
             }
 
             // Output multi-row INSERT statements
-            if ($insert_format === 'multi' && !empty($rows_for_batch)) {
-                $line = "INSERT INTO " . $escapeIdentifier($table_name) . " (" . implode(', ', array_map($escapeIdentifier, $columns)) . ") VALUES\n";
-                $output .= $this->write($line);
-                $output .= $this->write(implode(",\n", $rows_for_batch) . ";\n");
+            if ($is_multi && $rows_in_batch > 0) {
+                $this->write(";\n");
             }
         }
-
-        return $output;
     }
 
-    /**
-     * Escape value for COPY format
-     */
-    private function escapeBytea($value)
-    {
-        if ($value === null) {
-            return null;
+}
+
+/**
+ * Transforms raw binary data into PostgreSQL COPY-compatible octal escapes.
+ *
+ * Example:
+ *   "\xDE\xAD\xBE\xEF" → "\\336\\255\\276\\357"
+ *
+ * COPY expects exactly this format.
+ */
+function bytea_to_octal(string $data): string
+{
+    if ($data === '') {
+        return '';
+    }
+
+    static $map = null;
+    if ($map === null) {
+        $map = [];
+        for ($i = 0; $i < 256; $i++) {
+            if ($i >= 32 && $i <= 126 && $i !== 92) { // printable except backslash
+                $map[chr($i)] = chr($i);
+            } elseif ($i === 92) { // backslash
+                $map["\\"] = '\\\\';
+            } else { // non-printable
+                $map[chr($i)] = sprintf("\\%03o", $i);
+            }
         }
-        // COPY escaping: backslash and non-printable chars
-        return addcslashes($value, "\0\\\n\r\t");
     }
+
+    return strtr($data, $map);
 }

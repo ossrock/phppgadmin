@@ -17,32 +17,29 @@ class HtmlFormatter extends OutputFormatter
 
     /**
      * Format ADORecordSet as XHTML
-     * @param mixed $recordset ADORecordSet
+     * @param \ADORecordSet $recordset ADORecordSet
      * @param array $metadata Optional (unused, columns come from recordset)
-     * @return string
      */
     public function format($recordset, $metadata = [])
     {
-        $output = '';
-        $output .= $this->write('<?xml version="1.0" encoding="UTF-8"?>' . "\n");
-        $output .= $this->write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">' . "\n");
-        $output .= $this->write('<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">' . "\n");
-        $output .= $this->write("<head>\n");
-        $output .= $this->write('<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />' . "\n");
-        $output .= $this->write('<title>Database Export</title>' . "\n");
-        $output .= $this->write('<style type="text/css">' . "\n");
-        $output .= $this->write("table { border-collapse: collapse; border: 1px solid #999; }\n");
-        $output .= $this->write("th { background-color: #f0f0f0; border: 1px solid #999; padding: 5px; text-align: left; font-weight: bold; }\n");
-        $output .= $this->write("td { border: 1px solid #999; padding: 5px; }\n");
-        $output .= $this->write("tr:nth-child(even) { background-color: #f9f9f9; }\n");
-        $output .= $this->write("</style>\n");
-        $output .= $this->write("</head>\n");
-        $output .= $this->write("<body>\n");
-        $output .= $this->write("<table>\n");
-
+        $this->write('<?xml version="1.0" encoding="UTF-8"?>' . "\n");
+        $this->write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">' . "\n");
+        $this->write('<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">' . "\n");
+        $this->write("<head>\n");
+        $this->write("\t<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />\n");
+        $this->write("\t<title>Database Export</title>\n");
+        $this->write("\t<style type=\"text/css\">\n");
+        $this->write("\t\ttable { border-collapse: collapse; border: 1px solid #999; }\n");
+        $this->write("\t\tth { background-color: #f0f0f0; border: 1px solid #999; padding: 5px; text-align: left; font-weight: bold; }\n");
+        $this->write("\t\ttd { border: 1px solid #999; padding: 5px; }\n");
+        $this->write("\t\ttr:nth-child(even) { background-color: #f9f9f9; }\n");
+        $this->write("\t</style>\n");
+        $this->write("</head>\n");
+        $this->write("<body>\n");
+        $this->write("<table>\n");
         if (!$recordset || $recordset->EOF) {
-            $output .= $this->write("</table>\n</body>\n</html>\n");
-            return $output;
+            $this->write("</table>\n</body>\n</html>\n");
+            return;
         }
 
         // Get column names and write header
@@ -52,28 +49,25 @@ class HtmlFormatter extends OutputFormatter
             $columns[] = $finfo->name ?? "Column $i";
         }
 
-        $output .= $this->write("<thead>\n<tr>\n");
+        $this->write("\t<thead>\n\t<tr>\n");
         foreach ($columns as $column) {
-            $output .= $this->write('<th>' . htmlspecialchars($column, ENT_QUOTES, 'UTF-8') . '</th>' . "\n");
+            $this->write("\t\t<th>" . htmlspecialchars($column, ENT_QUOTES, 'UTF-8') . "</th>\n");
         }
-        $output .= $this->write("</tr>\n</thead>\n");
-
+        $this->write("\t</tr>\n\t</thead>\n");
         // Write data rows
-        $output .= $this->write("<tbody>\n");
+        $this->write("\t<tbody>\n");
         while (!$recordset->EOF) {
-            $output .= $this->write("<tr>\n");
+            $this->write("\t<tr>\n");
             foreach ($recordset->fields as $value) {
-                $output .= $this->write('<td>' . htmlspecialchars($value ?? 'NULL', ENT_QUOTES, 'UTF-8') . '</td>' . "\n");
+                $this->write("\t\t<td>" . htmlspecialchars($value ?? 'NULL', ENT_QUOTES, 'UTF-8') . "</td>\n");
             }
-            $output .= $this->write("</tr>\n");
+            $this->write("\t</tr>\n");
             $recordset->moveNext();
         }
-        $output .= $this->write("</tbody>\n");
+        $this->write("\t</tbody>\n");
 
-        $output .= $this->write("</table>\n");
-        $output .= $this->write("</body>\n");
-        $output .= $this->write("</html>\n");
-
-        return $output;
+        $this->write("</table>\n");
+        $this->write("</body>\n");
+        $this->write("</html>\n");
     }
 }

@@ -17,61 +17,64 @@ class TabFormatter extends OutputFormatter
 
     /**
      * Format ADORecordSet as tab-delimited
-     * @param mixed $recordset ADORecordSet
+     * @param \ADORecordSet $recordset ADORecordSet
      * @param array $metadata Optional (unused, columns come from recordset)
-     * @return string
      */
     public function format($recordset, $metadata = [])
     {
-        $output = '';
-
         if (!$recordset || $recordset->EOF) {
-            return '';
+            return;
         }
 
-        // Get column names from recordset
-        $columns = [];
-        for ($i = 0; $i < count($recordset->fields); $i++) {
+        $col_count = count($recordset->fields);
+
+        // Header
+        $header = '';
+        $sep = '';
+
+        for ($i = 0; $i < $col_count; $i++) {
             $finfo = $recordset->fetchField($i);
-            $columns[] = $finfo->name ?? "Column $i";
+            $name = $finfo->name ?? "Column $i";
+
+            $header .= $sep;
+            $header .= $this->escapeTabField($name);
+            $sep = "\t";
         }
 
-        // Write header row
-        $output .= $this->write($this->escapeTabLine($columns) . "\r\n");
+        $this->write($header . "\r\n");
 
-        // Write data rows
+        // Rows
         while (!$recordset->EOF) {
-            $row = [];
+            $line = '';
+            $sep = '';
+
             foreach ($recordset->fields as $value) {
-                $row[] = $value;
+                $line .= $sep;
+
+                if ($value !== null) {
+                    $line .= $this->escapeTabField($value);
+                }
+
+                $sep = "\t";
             }
-            $output .= $this->write($this->escapeTabLine($row) . "\r\n");
+
+            $this->write("$line\r\n");
             $recordset->moveNext();
         }
-
-        return $output;
     }
 
     /**
-     * Escape and quote tab-delimited line fields
+     * Fast tab-field escaping
      */
-    private function escapeTabLine(array $fields): string
+    private function escapeTabField($value): string
     {
-        $escaped = [];
-        foreach ($fields as $field) {
-            $escaped[] = $this->quoteTabField((string) $field);
+        $value = (string) $value;
+
+        if (strpbrk($value, "\t\"\n") !== false) {
+            return '"' . str_replace('"', '""', $value) . '"';
         }
-        return implode("\t", $escaped);
+
+        return $value;
     }
 
-    /**
-     * Quote a field if it contains tabs or newlines
-     */
-    private function quoteTabField(string $field): string
-    {
-        if (strpos($field, "\t") !== false || strpos($field, "\n") !== false || strpos($field, '"') !== false) {
-            return '"' . str_replace('"', '""', $field) . '"';
-        }
-        return $field;
-    }
 }

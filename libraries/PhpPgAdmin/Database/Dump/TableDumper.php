@@ -102,12 +102,8 @@ class TableDumper extends AbstractDumper
             'insert_format' => $insertFormat
         ];
 
-        $sql = $formatter->format($rs, $metadata);
+        $formatter->format($rs, $metadata);
 
-        // If formatter didn't write to stream (no outputStream set), write the accumulated string
-        if ($sql) {
-            $this->write($sql);
-        }
 
         // Restore fetch mode
         $this->connection->conn->setFetchMode(ADODB_FETCH_ASSOC);

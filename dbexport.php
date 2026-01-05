@@ -84,7 +84,7 @@ if ($use_internal) {
 
 	// Set response headers and open output stream
 	if ($output_method === 'show') {
-		ExportOutputRenderer::beginHtmlOutput(null, null);
+		ExportOutputRenderer::beginHtmlOutput();
 		$output_stream = null; // Show mode uses echo directly
 	} else {
 		// Use CompressionFactory for the requested compression (default to 'download')
@@ -166,7 +166,7 @@ if ($use_pg_dumpall) {
 
 	// Check version and warn if needed
 	if ($output_method === 'show') {
-		ExportOutputRenderer::beginHtmlOutput($pg_dumpall_path, '');
+		ExportOutputRenderer::beginHtmlOutput();
 		checkAndWarnVersionMismatch($pg_dumpall, 'pg_dumpall', $server_info);
 	} else {
 		checkAndWarnVersionMismatch($pg_dumpall, 'pg_dumpall', $server_info);
@@ -174,7 +174,7 @@ if ($use_pg_dumpall) {
 
 	// Execute based on output method
 	if ($output_method === 'show') {
-		ExportOutputRenderer::beginHtmlOutput($pg_dumpall_path, '');
+		ExportOutputRenderer::beginHtmlOutput();
 		checkAndWarnVersionMismatch($pg_dumpall, 'pg_dumpall', $server_info);
 		execute_dump_command($cmd, 'show');
 		ExportOutputRenderer::endHtmlOutput();
@@ -270,7 +270,8 @@ if ($use_pgdump && !empty($selected_databases)) {
 
 	// Set headers and execute
 	if ($output_method === 'show') {
-		ExportOutputRenderer::beginHtmlOutput($exe_path_pgdump, floatval($version[1] ?? ''));
+		ExportOutputRenderer::beginHtmlOutput();
+		echo "-- Dumping with " . htmlspecialchars($exe_path_pgdump) . " version " . floatval($version[1] ?? '') . "\n\n";
 		foreach ($cmd as $idx => $db_cmd) {
 			$dbName = $db_names[$idx] ?? null;
 			if ($dbName !== null) {
@@ -386,7 +387,8 @@ if ($use_pgdump) {
 
 	// Set headers for gzipped/download/show and execute
 	if ($output_method === 'show') {
-		ExportOutputRenderer::beginHtmlOutput($exe_path, $version[1]);
+		ExportOutputRenderer::beginHtmlOutput();
+		echo "-- Dumping with " . htmlspecialchars($exe_path) . " version " . $version[1] . "\n\n";
 		$targetDb = $_REQUEST['database'] ?? null;
 		if ($targetDb) {
 			$header = "--\n-- Dumping database: \"" . addslashes($targetDb) . "\"\n--\n\\connect \"" . addslashes($targetDb) . "\"\n\\encoding UTF8\nSET client_encoding = 'UTF8';\nSET session_replication_role = 'replica';\n\n";

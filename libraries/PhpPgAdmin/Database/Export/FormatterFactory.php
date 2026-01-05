@@ -12,7 +12,6 @@ class FormatterFactory
      */
     private const SUPPORTED_FORMATS = [
         'sql' => SqlFormatter::class,
-        'copy' => CopyFormatter::class,
         'csv' => CsvFormatter::class,
         'tab' => TabFormatter::class,
         'html' => HtmlFormatter::class,

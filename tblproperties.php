@@ -10,6 +10,7 @@ use PhpPgAdmin\Database\Actions\SchemaActions;
 use PhpPgAdmin\Database\Actions\ConstraintActions;
 use PhpPgAdmin\Gui\DumpRenderer;
 use PhpPgAdmin\Gui\ColumnFormRenderer;
+use PhpPgAdmin\Gui\QueryExportRenderer;
 
 /**
  * List tables in a database
@@ -198,15 +199,20 @@ function doAlter($msg = '')
 function doExport($msg = '')
 {
 	$misc = AppContainer::getMisc();
-	$lang = AppContainer::getLang();
+	$pg = AppContainer::getPostgres();
 
 	$misc->printTrail('table');
 	$misc->printTabs('table', 'export');
 	$misc->printMsg($msg);
 
-	// Use the unified DumpRenderer for the export form
-	$dumpRenderer = new DumpRenderer();
-	$dumpRenderer->renderExportForm('table', []);
+	$schema = $pg->escapeIdentifier($_REQUEST['schema']);
+	$table = $pg->escapeIdentifier($_REQUEST['table']);
+	$query = "SELECT * FROM {$schema}.{$table}";
+	$queryExportRenderer = new QueryExportRenderer();
+	$queryExportRenderer->renderExportForm($query, [
+		'subject' => 'table',
+		'table' => $_REQUEST['table'],
+	]);
 }
 
 function doImport($msg = '')

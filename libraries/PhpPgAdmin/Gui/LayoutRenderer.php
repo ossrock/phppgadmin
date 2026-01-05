@@ -528,7 +528,7 @@ EOT;
 			case 'bytea':
 				$tag = 'div';
 				$class = 'pre';
-				$out = $this->postgres()->escapeBytea($str);
+				$out = '\x' . strtoupper(bin2hex($str));
 				break;
 			case 'errormsg':
 				$tag = 'pre';

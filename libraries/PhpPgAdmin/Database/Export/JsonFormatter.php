@@ -15,67 +15,160 @@ class JsonFormatter extends OutputFormatter
     /** @var bool */
     protected $supportsGzip = true;
 
+    private const TYPE_DEFAULT = 0;
+    private const TYPE_INTEGER = 1;
+    private const TYPE_DECIMAL = 2;
+    private const TYPE_BOOLEAN = 3;
+    private const TYPE_BYTEA = 4;
+    private const TYPE_JSON = 5;
+
     /**
      * Format ADORecordSet as JSON
-     * @param mixed $recordset ADORecordSet
+     * @param \ADORecordSet $recordset ADORecordSet
      * @param array $metadata Optional (unused, columns come from recordset)
-     * @return string
      */
     public function format($recordset, $metadata = [])
     {
-        $json = [
-            'metadata' => [
-                'exported_at' => date('Y-m-d H:i:s'),
-                'columns' => [],
-                'row_count' => 0,
-            ],
-            'data' => [],
-        ];
-
         if (!$recordset || $recordset->EOF) {
-            $output = json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
-            return $this->write($output);
+            $this->write("{\"metadata\":{},\"data\":[]}\n");
+            return;
         }
 
-        // Get column information
+        $colCount = count($recordset->fields);
+
+        // --- 1) Column metadata ---
         $columns = [];
-        $fieldIndex = 0;
-        foreach ($recordset->fields as $fieldName => $fieldValue) {
-            $finfo = $recordset->fetchField($fieldIndex);
-            $type = $finfo->type ?? 'unknown';
+        $types = [];
+        $fields = [];
+        $type_code = [];
+        for ($i = 0; $i < $colCount; $i++) {
+            $finfo = $recordset->fetchField($i);
+            $name = $finfo->name ?? "col_$i";
+            $type = strtolower($finfo->type ?? 'unknown');
 
-            $col_name = $finfo->name ?? $fieldName;
-            $columns[$fieldIndex] = [
-                'name' => $col_name,
-                'type' => $type
-            ];
-            $json['metadata']['columns'][] = [
-                'name' => $col_name,
-                'type' => $type
-            ];
-            $fieldIndex++;
+            $columns[$i] = $name;
+            $types[$i] = $type;
+            $fields[$i] = json_encode($name, JSON_UNESCAPED_UNICODE);
+
+            // integer types → no escaping
+            if (
+                isset([
+                    'int2' => true,
+                    'int4' => true,
+                    'int8' => true,
+                    'integer' => true,
+                    'bigint' => true,
+                    'smallint' => true,
+                ][$type])
+            ) {
+                $type_code[$i] = self::TYPE_INTEGER;
+                continue;
+            }
+
+            // decimal types → probably no escaping
+            if (
+                isset([
+                    'float4' => true,
+                    'float8' => true,
+                    'real' => true,
+                    'double precision' => true,
+                    'numeric' => true,
+                    'decimal' => true
+                ][$type])
+            ) {
+                $type_code[$i] = self::TYPE_DECIMAL;
+                continue;
+            }
+
+            // boolean → no escaping
+            if ($type === 'bool' || $type === 'boolean') {
+                $type_code[$i] = self::TYPE_BOOLEAN;
+                continue;
+            }
+
+            // bytea → base64 encoding
+            if ($type === 'bytea') {
+                $type_code[$i] = self::TYPE_BYTEA;
+                continue;
+            }
+
+            // json/jsonb → no escaping
+            if ($type === 'json' || $type === 'jsonb') {
+                $type_code[$i] = self::TYPE_JSON;
+                continue;
+            }
+
+            $type_code[$i] = self::TYPE_DEFAULT;
         }
 
-        // Write rows as objects mapped to column names
-        $row_count = 0;
+        // --- 2) Write JSON header ---
+        $this->write("{\n");
+        $this->write("\t\"columns\": [\n");
+
+        $sep = "";
+        for ($i = 0; $i < $colCount; $i++) {
+            $this->write($sep . "\t\t" . json_encode([
+                'name' => $columns[$i],
+                'type' => $types[$i]
+            ], JSON_UNESCAPED_UNICODE));
+            $sep = ",\n";
+        }
+
+        $this->write("\n\t],\n");
+        $this->write("\t\"data\": [\n");
+
+        // --- 3) Stream rows ---
+        $sep = "";
+
         while (!$recordset->EOF) {
-            $row_obj = [];
-            $i = 0;
-            foreach ($recordset->fields as $fieldValue) {
-                if (isset($columns[$i])) {
-                    $col_name = $columns[$i]['name'];
-                    $row_obj[$col_name] = $fieldValue;
+            $this->write($sep);
+            $this->write("\t\t{");
+
+            $innerSep = "";
+            foreach ($recordset->fields as $i => $value) {
+                $this->write($innerSep . $fields[$i] . ":");
+                $innerSep = ",";
+                if ($value === null) {
+                    $this->write("null");
+                    continue;
                 }
-                $i++;
+                switch ($type_code[$i]) {
+                    case self::TYPE_INTEGER:
+                        $this->write($value);
+                        break;
+                    case self::TYPE_DECIMAL:
+                        // Handle special float values
+                        if ($value === "NaN" || $value === "Infinity" || $value === "-Infinity") {
+                            $this->write('"' . addcslashes($value, "\\\"\n\r\t\f\b") . '"');
+                        } else {
+                            $this->write($value);
+                        }
+                        break;
+                    case self::TYPE_BOOLEAN:
+                        $this->write($value ? "true" : "false");
+                        break;
+                    case self::TYPE_BYTEA:
+                        $this->write('"' . base64_encode($value) . '"');
+                        break;
+                    case self::TYPE_JSON:
+                        $this->write($value);
+                        break;
+                    default:
+                        $this->write('"' . addcslashes($value, "\\\"\n\r\t\f\b") . '"');
+                }
             }
-            $json['data'][] = $row_obj;
-            $row_count++;
+
+            $this->write("}");
+            $sep = ",\n";
+
             $recordset->moveNext();
         }
 
-        $json['metadata']['row_count'] = $row_count;
-
-        $output = json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
-        return $this->write($output);
+        // --- 4) Close JSON ---
+        $this->write("\n\t]\n");
+        $this->write("}\n");
     }
+
+
+
 }

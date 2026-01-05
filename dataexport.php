@@ -70,6 +70,7 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'export') {
 	}
 
 	// Execute the query
+	$pg->conn->setFetchMode(ADODB_FETCH_NUM);
 	$rs = $pg->conn->Execute($query);
 	if (!$rs) {
 		header('HTTP/1.0 500 Internal Server Error');
@@ -82,9 +83,9 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'export') {
 	$mime_type = $formatter->getMimeType();
 	$file_extension = $formatter->getFileExtension();
 
-	if ($output === 'show') {
+	if ($output_method === 'show') {
 		// For browser display, use unified HTML wrapper
-		ExportOutputRenderer::beginHtmlOutput();
+		ExportOutputRenderer::beginHtmlOutput(['mode' => $output_format]);
 		$output_stream = null; // HTML mode uses echo directly
 	} else {
 		// For all other output methods (download with optional compression), use CompressionFactory
@@ -105,7 +106,7 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'export') {
 
 	// Build metadata for formatter
 	$metadata = [
-		'table' => $_REQUEST['table'] ?? 'query_result',
+		'table' => $_REQUEST['table'] ?? $_REQUEST['view'] ?? 'query_result',
 		'insert_format' => $insert_format
 	];
 
@@ -117,11 +118,12 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'export') {
 	$formatter->format($rs, $metadata);
 
 	// Close streams for download and gzipped output
-	if ($output !== 'show' && isset($strategy) && isset($handle)) {
+	if ($output_method !== 'show' && isset($strategy) && isset($handle)) {
 		$strategy->finish($handle);
-	} elseif ($output === 'show') {
+	} elseif ($output_method === 'show') {
 		ExportOutputRenderer::endHtmlOutput();
 	}
+	exit;
 }
 
 // If not an export action, display the export form

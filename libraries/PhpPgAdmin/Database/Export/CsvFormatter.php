@@ -15,65 +15,105 @@ class CsvFormatter extends OutputFormatter
     /** @var bool */
     protected $supportsGzip = true;
 
+    /** @var \PhpPgAdmin\Database\Postgres */
+    private $pg;
+
     /**
      * Format ADORecordSet as CSV
-     * @param mixed $recordset ADORecordSet
+     * @param \ADORecordSet $recordset ADORecordSet
      * @param array $metadata Optional (unused, columns come from recordset)
-     * @return string
      */
     public function format($recordset, $metadata = [])
     {
-        $output = '';
-
         if (!$recordset || $recordset->EOF) {
-            return '';
+            return;
         }
 
-        // Get column names from recordset
-        $columns = [];
-        for ($i = 0; $i < count($recordset->fields); $i++) {
+        $this->pg = $this->postgres();
+
+        // Detect bytea columns once
+        $is_bytea = [];
+        $col_count = count($recordset->fields);
+
+        for ($i = 0; $i < $col_count; $i++) {
             $finfo = $recordset->fetchField($i);
-            $columns[] = $finfo->name ?? "Column $i";
+            $type = strtolower($finfo->type ?? '');
+            $is_bytea[$i] = ($type === 'bytea');
         }
 
-        // Write header row
-        $output .= $this->write($this->escapeCsvLine($columns) . "\r\n");
+        // Header
+        $columns = [];
+        for ($i = 0; $i < $col_count; $i++) {
+            $finfo = $recordset->fetchField($i);
+            $columns[$i] = $finfo->name ?? "Column $i";
+        }
+        $this->write($this->csvLineRaw($columns));
 
-        // Write data rows
+        // Rows
         while (!$recordset->EOF) {
-            $row = [];
-            foreach ($recordset->fields as $value) {
-                $row[] = $value;
-            }
-            $output .= $this->write($this->escapeCsvLine($row) . "\r\n");
+            $this->write($this->csvLineRecord($recordset->fields, $is_bytea));
             $recordset->moveNext();
         }
-
-        return $output;
     }
 
     /**
-     * Escape and quote CSV fields
+     * CSV line for header (no bytea)
      */
-    private function escapeCsvLine(array $fields): string
+    private function csvLineRaw(array $fields): string
     {
-        $escaped = [];
+        $out = '';
+        $sep = '';
+
         foreach ($fields as $field) {
-            $escaped[] = $this->quoteCsvField((string) $field);
+            $out .= $sep;
+            $out .= $this->csvField($field);
+            $sep = ',';
         }
-        return implode(',', $escaped);
+
+        return $out . "\r\n";
     }
 
     /**
-     * Quote a single CSV field if necessary
+     * CSV line for data rows (with bytea support)
      */
-    private function quoteCsvField(string $field): string
+    private function csvLineRecord(array $fields, array $is_bytea): string
     {
-        // Quote if contains comma, double-quote, or newline
-        if (strpos($field, ',') !== false || strpos($field, '"') !== false || strpos($field, "\n") !== false) {
-            // Escape double quotes by doubling them
-            return '"' . str_replace('"', '""', $field) . '"';
+        $out = '';
+        $sep = '';
+
+        foreach ($fields as $i => $value) {
+            $out .= $sep;
+
+            if ($value === null) {
+                // empty field
+                // nothing appended
+            } else {
+                if ($is_bytea[$i]) {
+                    // bytea → escapeBytea → then CSV-escape
+                    $value = $this->pg->escapeBytea($value);
+                }
+                $out .= $this->csvField($value);
+            }
+
+            $sep = ',';
         }
-        return $field;
+
+        return $out . "\r\n";
     }
+
+    /**
+     * Fast CSV field escaping
+     */
+    private function csvField($value): string
+    {
+        $value = (string) $value;
+
+        // One scan instead of 3× strpos()
+        if (strpbrk($value, ",\"\n") !== false) {
+            return '"' . str_replace('"', '""', $value) . '"';
+        }
+
+        return $value;
+    }
+
 }

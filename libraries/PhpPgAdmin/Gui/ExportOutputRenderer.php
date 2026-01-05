@@ -15,10 +15,9 @@ class ExportOutputRenderer
      * Start HTML output for "show in browser" mode.
      * Renders header, navigation, and opens textarea container.
      *
-     * @param string|null $exe_path Optional path to external dump utility (e.g., pg_dump)
-     * @param string|null $version Optional version of the utility
+     * @param array|null $options Optional options array
      */
-    public static function beginHtmlOutput($exe_path = null, $version = null)
+    public static function beginHtmlOutput($options = null)
     {
         AppContainer::setSkipHtmlFrame(false);
         $misc = AppContainer::getMisc();
@@ -30,15 +29,19 @@ class ExportOutputRenderer
 
         ?>
         <div class="mb-2">
-            <input type="button" value="🔙 Back" onclick="history.back()">
-            <input type="button" value="🔄 Reload" onclick="location.reload()">
-            <input type="button" value="✨ Highlight" onclick="createSqlEditor(document.getElementById('export-output'))">
+            <input class="ui-btn" type="button" value="🔙 Back" onclick="history.back()">
+            <input class="ui-btn" type="button" value="🔄 Reload" onclick="location.reload()">
+            <input class="ui-btn" type="button" value="✨ Highlight"
+                onclick="createSqlEditor(document.getElementById('export-output'))">
         </div>
         <?php
-        echo "<textarea id=\"export-output\" class=\"export-output\">";
-        if ($exe_path && $version) {
-            echo "-- Dumping with " . htmlspecialchars($exe_path) . " version " . $version . "\n\n";
+        $modeAttr = isset($options['mode']) ? " data-mode=\"{$options['mode']}\"" : '';
+        echo "<textarea id=\"export-output\" class=\"export-output\"$modeAttr>";
+        /*
+        if ($options && isset($options['exe_path']) && isset($options['version'])) {
+            echo "-- Dumping with " . htmlspecialchars($options['exe_path']) . " version " . $options['version'] . "\n\n";
         }
+        */
     }
 
     /**
@@ -50,9 +53,10 @@ class ExportOutputRenderer
         echo "</textarea>\n";
         ?>
         <div class="my-2">
-            <input type="button" value="🔙 Back" onclick="history.back()">
-            <input type="button" value="🔄 Reload" onclick="location.reload()">
-            <input type="button" value="✨ Highlight" onclick="createSqlEditor(document.getElementById('export-output'))">
+            <input class="ui-btn" type="button" value="🔙 Back" onclick="history.back()">
+            <input class="ui-btn" type="button" value="🔄 Reload" onclick="location.reload()">
+            <input class="ui-btn" type="button" value="✨ Highlight"
+                onclick="createSqlEditor(document.getElementById('export-output'))">
         </div>
         <?php
         $misc = AppContainer::getMisc();

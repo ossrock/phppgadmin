@@ -2,11 +2,13 @@
 
 namespace PhpPgAdmin\Database\Export;
 
+use PhpPgAdmin\Core\AbstractContext;
+
 /**
  * Abstract base class for export output formatters.
  * Each formatter is responsible for transforming dumped data into a specific output format.
  */
-abstract class OutputFormatter
+abstract class OutputFormatter extends AbstractContext
 {
     /**
      * The MIME type for this format (e.g., 'text/plain', 'text/csv')
@@ -71,20 +73,17 @@ abstract class OutputFormatter
     }
 
     /**
-     * Write data to output stream or accumulate as string.
-     * If output stream is set, writes to it and returns empty string.
-     * Otherwise, accumulates and returns the string for collection.
+     * Write data to output stream or echo output.
      *
      * @param string $data Data to write
-     * @return string Empty string if stream is set, otherwise accumulated string
      */
     protected function write($data)
     {
         if ($this->outputStream) {
             fwrite($this->outputStream, $data);
-            return '';
+        } else {
+            echo $data;
         }
-        return $data;
     }
 
     /**
@@ -92,9 +91,8 @@ abstract class OutputFormatter
      * Input: ADODB RecordSet with data rows from query or table dump
      * Output: Written to stream (if set) or accumulated as string
      *
-     * @param mixed $recordset ADORecordSet with data rows
+     * @param \ADORecordSet $recordset ADORecordSet with data rows
      * @param array $metadata Optional metadata (table name, columns, types, etc.)
-     * @return string The formatted output (empty if using stream)
      */
     abstract public function format($recordset, $metadata = []);
 }

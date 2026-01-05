@@ -9,7 +9,8 @@ use ADOConnection;
 use ADORecordSet;
 use PhpPgAdmin\Core\AbstractContext;
 
-abstract class AbstractConnection extends AbstractContext {
+abstract class AbstractConnection extends AbstractContext
+{
 
 	/**
 	 * @var ADOConnection
@@ -29,7 +30,8 @@ abstract class AbstractConnection extends AbstractContext {
 	 * Base constructor
 	 * @param $conn ADOConnection The connection object
 	 */
-	function __construct(ADOConnection $conn) {
+	function __construct(ADOConnection $conn)
+	{
 		$this->conn = $conn;
 		//$conn->LogSQL(true);
 	}
@@ -38,7 +40,8 @@ abstract class AbstractConnection extends AbstractContext {
 	 * Turns on or off query debugging
 	 * @param $debug True to turn on debugging, false otherwise
 	 */
-	function setDebug($debug) {
+	function setDebug($debug)
+	{
 		$this->conn->debug = $debug;
 	}
 
@@ -47,8 +50,10 @@ abstract class AbstractConnection extends AbstractContext {
 	 * @param string $str The string to clean, by reference
 	 * @return string The cleaned string
 	 */
-	function clean(&$str) {
-		if ($str === null) return null;
+	function clean(&$str)
+	{
+		if ($str === null)
+			return null;
 		$str = str_replace("\r\n", "\n", $str);
 		$str = pg_escape_string($this->conn->_connectionID, $str);
 		return $str;
@@ -59,8 +64,10 @@ abstract class AbstractConnection extends AbstractContext {
 	 * @param string $str The string to clean, by reference
 	 * @return string The cleaned string
 	 */
-	function fieldClean(&$str) {
-		if ($str === null) return null;
+	function fieldClean(&$str)
+	{
+		if ($str === null)
+			return null;
 		$str = str_replace('"', '""', $str);
 		return $str;
 	}
@@ -70,9 +77,11 @@ abstract class AbstractConnection extends AbstractContext {
 	 * @param array $arr The array to clean, by reference
 	 * @return array The cleaned array
 	 */
-	function fieldArrayClean(&$arr) {
+	function fieldArrayClean(&$arr)
+	{
 		foreach ($arr as $k => $v) {
-			if ($v === null) continue;
+			if ($v === null)
+				continue;
 			$arr[$k] = str_replace('"', '""', $v);
 		}
 		return $arr;
@@ -83,9 +92,11 @@ abstract class AbstractConnection extends AbstractContext {
 	 * @param array $arr The array to clean, by reference
 	 * @return array The cleaned array
 	 */
-	function arrayClean(&$arr) {
+	function arrayClean(&$arr)
+	{
 		foreach ($arr as $k => $v) {
-			if ($v === null) continue;
+			if ($v === null)
+				continue;
 			$arr[$k] = pg_escape_string($this->conn->_connectionID, $v);
 		}
 		return $arr;
@@ -96,12 +107,39 @@ abstract class AbstractConnection extends AbstractContext {
 	 * @param string $data The bytea data
 	 * @return string Data formatted for on-screen display
 	 */
-	function escapeBytea($data) {
+	function escapeByteaHtml($data)
+	{
 		return htmlentities($data, ENT_QUOTES, 'UTF-8');
 	}
 
-	public function escapeIdentifier($id = ''): string {
+	/**
+	 * Escapes an identifier (table, field, etc.)
+	 * @param string $id The identifier to escape
+	 * @return string The escaped identifier
+	 */
+	public function escapeIdentifier($id = ''): string
+	{
 		return pg_escape_identifier($this->conn->_connectionID, $id);
+	}
+
+	/**
+	 * Escapes a literal value
+	 * @param string $literal The literal to escape
+	 * @return string The escaped literal
+	 */
+	public function escapeLiteral($literal = ''): string
+	{
+		return pg_escape_literal($this->conn->_connectionID, $literal);
+	}
+
+	/**
+	 * Escapes bytea data for storage in the database
+	 * @param string $str The bytea data
+	 * @return string The escaped bytea data
+	 */
+	public function escapeBytea($str = ''): string
+	{
+		return pg_escape_bytea($this->conn->_connectionID, $str);
 	}
 
 	/**
@@ -109,7 +147,8 @@ abstract class AbstractConnection extends AbstractContext {
 	 * @param string $sql The SQL query to execute
 	 * @return int error number
 	 */
-	function execute($sql) {
+	function execute($sql)
+	{
 		// Execute the statement
 		$this->conn->Execute($sql);
 
@@ -121,7 +160,8 @@ abstract class AbstractConnection extends AbstractContext {
 	 * Closes the connection the database class
 	 * relies on.
 	 */
-	function close() {
+	function close()
+	{
 		$this->conn->close();
 	}
 
@@ -132,7 +172,8 @@ abstract class AbstractConnection extends AbstractContext {
 	 * @param string $sql The SQL statement to be executed
 	 * @return ADORecordSet|int A recordset
 	 */
-	function selectSet($sql) {
+	function selectSet($sql)
+	{
 
 		$start = microtime(true);
 
@@ -142,12 +183,14 @@ abstract class AbstractConnection extends AbstractContext {
 		$end = microtime(true);
 		$this->lastQueryTime = $end - $start;
 
-		if (!$rs) return $this->conn->ErrorNo();
+		if (!$rs)
+			return $this->conn->ErrorNo();
 
 		return $rs;
 	}
 
-	public function getLastQueryTime() {
+	public function getLastQueryTime()
+	{
 		return $this->lastQueryTime;
 	}
 
@@ -161,13 +204,16 @@ abstract class AbstractConnection extends AbstractContext {
 	 * @return mixed A single field value
 	 * @return -1 No rows were found
 	 */
-	function selectField($sql, $field) {
+	function selectField($sql, $field)
+	{
 		// Execute the statement
 		$rs = $this->conn->Execute($sql);
 
 		// If failure, or no rows returned, return error value
-		if (!$rs) return $this->conn->ErrorNo();
-		elseif ($rs->RecordCount() == 0) return -1;
+		if (!$rs)
+			return $this->conn->ErrorNo();
+		elseif ($rs->RecordCount() == 0)
+			return -1;
 
 		return $rs->fields[$field];
 	}
@@ -181,7 +227,8 @@ abstract class AbstractConnection extends AbstractContext {
 	 * @return int -1 on referential integrity violation
 	 * @return int -2 on no rows deleted
 	 */
-	function delete($table, $conditions, $schema = '') {
+	function delete($table, $conditions, $schema = '')
+	{
 		$this->fieldClean($table);
 
 		if (!empty($schema)) {
@@ -191,11 +238,13 @@ abstract class AbstractConnection extends AbstractContext {
 
 		// Build clause
 		$sql = '';
-		foreach($conditions as $key => $value) {
+		foreach ($conditions as $key => $value) {
 			$this->clean($key);
 			$this->clean($value);
-			if ($sql) $sql .= " AND \"{$key}\"='{$value}'";
-			else $sql = "DELETE FROM {$schema}\"{$table}\" WHERE \"{$key}\"='{$value}'";
+			if ($sql)
+				$sql .= " AND \"{$key}\"='{$value}'";
+			else
+				$sql = "DELETE FROM {$schema}\"{$table}\" WHERE \"{$key}\"='{$value}'";
 		}
 
 		// Check for failures
@@ -206,7 +255,8 @@ abstract class AbstractConnection extends AbstractContext {
 		}
 
 		// Check for no rows modified
-		if ($this->conn->Affected_Rows() == 0) return -2;
+		if ($this->conn->Affected_Rows() == 0)
+			return -2;
 
 		return $this->conn->ErrorNo();
 	}
@@ -219,22 +269,27 @@ abstract class AbstractConnection extends AbstractContext {
 	 * @return int -1 if a unique constraint is violated
 	 * @return int -2 if a referential constraint is violated
 	 */
-	function insert($table, $vars) {
+	function insert($table, $vars)
+	{
 		$this->fieldClean($table);
 
 		// Build clause
 		if (sizeof($vars) > 0) {
 			$fields = '';
 			$values = '';
-			foreach($vars as $key => $value) {
+			foreach ($vars as $key => $value) {
 				$this->clean($key);
 				$this->clean($value);
 
-				if ($fields) $fields .= ", \"{$key}\"";
-				else $fields = "INSERT INTO \"{$table}\" (\"{$key}\"";
+				if ($fields)
+					$fields .= ", \"{$key}\"";
+				else
+					$fields = "INSERT INTO \"{$table}\" (\"{$key}\"";
 
-				if ($values) $values .= ", '{$value}'";
-				else $values = ") VALUES ('{$value}'";
+				if ($values)
+					$values .= ", '{$value}'";
+				else
+					$values = ") VALUES ('{$value}'";
 			}
 			$sql = $fields . $values . ')';
 		}
@@ -263,31 +318,38 @@ abstract class AbstractConnection extends AbstractContext {
 	 * @return int -2 if a referential constraint is violated
 	 * @return int -3 on no rows deleted
 	 */
-	function update($table, $vars, $where, $nulls = []) {
+	function update($table, $vars, $where, $nulls = [])
+	{
 		$this->fieldClean($table);
 
 		$setClause = '';
 		$whereClause = '';
 
 		// Populate the syntax arrays
-		foreach($vars as $key => $value) {
+		foreach ($vars as $key => $value) {
 			$this->fieldClean($key);
 			$this->clean($value);
-			if ($setClause) $setClause .= ", \"{$key}\"='{$value}'";
-			else $setClause = "UPDATE \"{$table}\" SET \"{$key}\"='{$value}'";
+			if ($setClause)
+				$setClause .= ", \"{$key}\"='{$value}'";
+			else
+				$setClause = "UPDATE \"{$table}\" SET \"{$key}\"='{$value}'";
 		}
 
-		foreach($nulls as $value) {
+		foreach ($nulls as $value) {
 			$this->fieldClean($value);
-			if ($setClause) $setClause .= ", \"{$value}\"=NULL";
-			else $setClause = "UPDATE \"{$table}\" SET \"{$value}\"=NULL";
+			if ($setClause)
+				$setClause .= ", \"{$value}\"=NULL";
+			else
+				$setClause = "UPDATE \"{$table}\" SET \"{$value}\"=NULL";
 		}
 
-		foreach($where as $key => $value) {
+		foreach ($where as $key => $value) {
 			$this->fieldClean($key);
 			$this->clean($value);
-			if ($whereClause) $whereClause .= " AND \"{$key}\"='{$value}'";
-			else $whereClause = " WHERE \"{$key}\"='{$value}'";
+			if ($whereClause)
+				$whereClause .= " AND \"{$key}\"='{$value}'";
+			else
+				$whereClause = " WHERE \"{$key}\"='{$value}'";
 		}
 
 		// Check for failures
@@ -301,7 +363,8 @@ abstract class AbstractConnection extends AbstractContext {
 		}
 
 		// Check for no rows modified
-		if ($this->conn->Affected_Rows() == 0) return -3;
+		if ($this->conn->Affected_Rows() == 0)
+			return -3;
 
 		return $this->conn->ErrorNo();
 	}
@@ -310,7 +373,8 @@ abstract class AbstractConnection extends AbstractContext {
 	 * Begin a transaction
 	 * @return int 0 success
 	 */
-	function beginTransaction() {
+	function beginTransaction()
+	{
 		return $this->conn->BeginTrans() ? 0 : -1;
 	}
 
@@ -318,7 +382,8 @@ abstract class AbstractConnection extends AbstractContext {
 	 * End a transaction
 	 * @return int 0 success
 	 */
-	function endTransaction() {
+	function endTransaction()
+	{
 		return $this->conn->CommitTrans() ? 0 : -1;
 	}
 
@@ -326,7 +391,8 @@ abstract class AbstractConnection extends AbstractContext {
 	 * Roll back a transaction
 	 * @return int 0 success
 	 */
-	function rollbackTransaction() {
+	function rollbackTransaction()
+	{
 		return $this->conn->RollbackTrans() ? 0 : -1;
 	}
 
@@ -334,7 +400,8 @@ abstract class AbstractConnection extends AbstractContext {
 	 * Get the backend platform
 	 * @return string The backend platform
 	 */
-	function getPlatform() {
+	function getPlatform()
+	{
 		return $this->platform;
 		//return "UNKNOWN";
 	}
@@ -345,9 +412,12 @@ abstract class AbstractConnection extends AbstractContext {
 	 * Change the value of a parameter to 't' or 'f' depending on whether it evaluates to true or false
 	 * @param $parameter the parameter
 	 */
-	function dbBool(&$parameter) {
-		if ($parameter) $parameter = 't';
-		else $parameter = 'f';
+	function dbBool(&$parameter)
+	{
+		if ($parameter)
+			$parameter = 't';
+		else
+			$parameter = 'f';
 
 		return $parameter;
 	}
@@ -357,7 +427,8 @@ abstract class AbstractConnection extends AbstractContext {
 	 * @param string $parameter the parameter
 	 * @return bool
 	 */
-	function phpBool($parameter) {
+	function phpBool($parameter)
+	{
 		$parameter = ($parameter == 't');
 		return $parameter;
 	}
@@ -367,8 +438,9 @@ abstract class AbstractConnection extends AbstractContext {
 	 * @param string $dbarr String representing the DB array
 	 * @return array A PHP array
 	 */
-	function phpArray($dbarr) {
-		
+	function phpArray($dbarr)
+	{
+
 		if (empty($dbarr)) {
 			return [];
 		}

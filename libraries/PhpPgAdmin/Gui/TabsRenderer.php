@@ -437,18 +437,18 @@ class TabsRenderer extends AbstractContext
                         'help' => 'pg.privilege',
                         'icon' => 'Privileges',
                     ],
-                    'import' => [
-                        'title' => $lang['strimport'],
-                        'url' => 'tblproperties.php',
-                        'urlvars' => ['subject' => 'table', 'table' => field('table'), 'action' => 'import'],
-                        'icon' => 'Import',
-                        'hide' => false,
-                    ],
                     'export' => [
                         'title' => $lang['strexport'],
                         'url' => 'tblproperties.php',
                         'urlvars' => ['subject' => 'table', 'table' => field('table'), 'action' => 'export'],
                         'icon' => 'Export',
+                        'hide' => false,
+                    ],
+                    'import' => [
+                        'title' => $lang['strimport'],
+                        'url' => 'tblproperties.php',
+                        'urlvars' => ['subject' => 'table', 'table' => field('table'), 'action' => 'import'],
+                        'icon' => 'Import',
                         'hide' => false,
                     ],
                 ];

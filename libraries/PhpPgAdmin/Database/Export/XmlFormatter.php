@@ -17,19 +17,17 @@ class XmlFormatter extends OutputFormatter
 
     /**
      * Format ADORecordSet as XML
-     * @param mixed $recordset ADORecordSet
+     * @param \ADORecordSet $recordset ADORecordSet
      * @param array $metadata Optional (unused, columns come from recordset)
-     * @return string
      */
     public function format($recordset, $metadata = [])
     {
-        $output = '';
-        $output .= $this->write('<?xml version="1.0" encoding="UTF-8"?>' . "\n");
-        $output .= $this->write("<data>\n");
+        $this->write('<?xml version="1.0" encoding="UTF-8"?>' . "\n");
+        $this->write("<data>\n");
 
         if (!$recordset || $recordset->EOF) {
-            $output .= $this->write("</data>\n");
-            return $output;
+            $this->write("</data>\n");
+            return;
         }
 
         // Get column information from recordset fields
@@ -47,18 +45,18 @@ class XmlFormatter extends OutputFormatter
         }
 
         // Write header with column information
-        $output .= $this->write("<header>\n");
+        $this->write("<header>\n");
         foreach ($columns as $col) {
             $name = $this->xmlEscape($col['name']);
             $type = $this->xmlEscape($col['type']);
-            $output .= $this->write("\t<column name=\"{$name}\" type=\"{$type}\" />\n");
+            $this->write("\t<col name=\"{$name}\" type=\"{$type}\" />\n");
         }
-        $output .= $this->write("</header>\n");
+        $this->write("</header>\n");
 
         // Write records section
-        $output .= $this->write("<records>\n");
+        $this->write("<records>\n");
         while (!$recordset->EOF) {
-            $output .= $this->write("\t<row>\n");
+            $this->write("\t<row>\n");
             $i = 0;
             foreach ($recordset->fields as $fieldValue) {
                 if (isset($columns[$i])) {
@@ -67,18 +65,16 @@ class XmlFormatter extends OutputFormatter
                     if (!is_null($value)) {
                         $value = $this->xmlEscape($value);
                     }
-                    $output .= $this->write("\t\t<column name=\"{$col_name}\"" . (is_null($value) ? ' null="null"' : '') . ">{$value}</column>\n");
+                    $this->write("\t\t<col name=\"{$col_name}\"" . (is_null($value) ? ' null="null"' : '') . ">{$value}</col>\n");
                 }
                 $i++;
             }
-            $output .= $this->write("\t</row>\n");
+            $this->write("\t</row>\n");
             $recordset->moveNext();
         }
-        $output .= $this->write("</records>\n");
+        $this->write("</records>\n");
 
-        $output .= $this->write("</data>\n");
-
-        return $output;
+        $this->write("</data>\n");
     }
 
     /**

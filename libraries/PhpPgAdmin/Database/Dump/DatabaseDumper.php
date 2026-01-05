@@ -67,17 +67,19 @@ class DatabaseDumper extends AbstractDumper
 
         // Save current database and reconnect to target database
         $originalDatabase = $this->connection->conn->database;
-        $this->connection->conn->close();
-
-        // Reconnect to the target database
         $serverInfo = AppContainer::getMisc()->getServerInfo();
-        $this->connection->conn->connect(
-            $serverInfo['host'],
-            $serverInfo['username'] ?? '',
-            $serverInfo['password'] ?? '',
-            $database,
-            $serverInfo['port'] ?? 5432
-        );
+
+        if ($database != $originalDatabase) {
+            $this->connection->conn->close();
+            // Reconnect to the target database
+            $this->connection->conn->connect(
+                $serverInfo['host'] ?? '',
+                $serverInfo['username'] ?? '',
+                $serverInfo['password'] ?? '',
+                $database,
+                $serverInfo['port'] ?? 5432
+            );
+        }
 
         // Iterate through schemas
         $schemaActions = new SchemaActions($this->connection);
@@ -104,14 +106,16 @@ class DatabaseDumper extends AbstractDumper
             $this->connection->endDump();
         }
 
-        // Reconnect to original database
-        $this->connection->conn->close();
-        $this->connection->conn->connect(
-            $serverInfo['host'],
-            $serverInfo['username'] ?? '',
-            $serverInfo['password'] ?? '',
-            $originalDatabase,
-            $serverInfo['port'] ?? 5432
-        );
+        if ($database != $originalDatabase) {
+            // Reconnect to original database
+            $this->connection->conn->close();
+            $this->connection->conn->connect(
+                $serverInfo['host'] ?? '',
+                $serverInfo['username'] ?? '',
+                $serverInfo['password'] ?? '',
+                $originalDatabase,
+                $serverInfo['port'] ?? 5432
+            );
+        }
     }
 }
