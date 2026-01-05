@@ -35,8 +35,16 @@ class SchemaDumper extends AbstractDumper
         $c_schema = $schema;
         $this->connection->clean($c_schema);
 
-        $this->writeDrop('SCHEMA', $c_schema, $options);
-        $this->write("CREATE SCHEMA " . $this->getIfNotExists($options) . "\"" . addslashes($c_schema) . "\";\n");
+        // Write standard dump header for schema exports
+        $this->writeHeader("Schema: " . addslashes($c_schema));
+
+        // Schema creation and header may be suppressed for limited-privilege users
+        if (empty($options['suppress_create_schema'])) {
+            $this->writeDrop('SCHEMA', $c_schema, $options);
+            $this->write("CREATE SCHEMA " . $this->getIfNotExists($options) . "\"" . addslashes($c_schema) . "\";\n");
+        }
+
+        // Always set the search_path so subsequent object DDL applies to the intended schema
         $this->write("SET search_path = \"" . addslashes($c_schema) . "\", pg_catalog;\n\n");
 
         // 1. Types & Domains
@@ -72,6 +80,7 @@ class SchemaDumper extends AbstractDumper
         $domainDumper = $this->createSubDumper('domain');
 
         while ($types && !$types->EOF) {
+            //var_dump($types->fields);
             if ($types->fields['typtype'] === 'd') {
                 $domainDumper->dump('domain', ['domain' => $types->fields['typname'], 'schema' => $schema], $options);
             } else {

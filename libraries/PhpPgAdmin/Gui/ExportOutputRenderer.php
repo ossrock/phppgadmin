@@ -29,30 +29,13 @@ class ExportOutputRenderer
         $misc->printTabs($subject, 'export');
 
         ?>
-        <style>
-            .export-controls {
-                margin-bottom: 15px;
-            }
-
-            .export-controls a {
-                margin-right: 15px;
-                padding: 5px 10px;
-                background: #f0f0f0;
-                border: 1px solid #ccc;
-                text-decoration: none;
-                border-radius: 3px;
-            }
-
-            .export-controls a:hover {
-                background: #e0e0e0;
-            }
-        </style>
-        <div class="export-controls">
-            <a href="javascript:history.back()">← Back</a>
-            <a href="javascript:location.reload()">↻ Reload</a>
+        <div class="mb-2">
+            <input type="button" value="🔙 Back" onclick="history.back()">
+            <input type="button" value="🔄 Reload" onclick="location.reload()">
+            <input type="button" value="✨ Format" onclick="createSqlEditor(document.getElementById('export-output'))">
         </div>
         <?php
-        echo "<textarea class=\"dbexport\" readonly>";
+        echo "<textarea id=\"export-output\" class=\"export-output\" readonly>";
         if ($exe_path && $version) {
             echo "-- Dumping with " . htmlspecialchars($exe_path) . " version " . $version . "\n\n";
         }
@@ -66,9 +49,10 @@ class ExportOutputRenderer
     {
         echo "</textarea>\n";
         ?>
-        <div class="export-controls" style="margin-top: 15px;">
-            <a href="javascript:history.back()">← Back</a>
-            <a href="javascript:location.reload()">↻ Reload</a>
+        <div class="my-2">
+            <input type="button" value="🔙 Back" onclick="history.back()">
+            <input type="button" value="🔄 Reload" onclick="location.reload()">
+            <input type="button" value="✨ Format" onclick="createSqlEditor(document.getElementById('export-output'))">
         </div>
         <?php
         $misc = AppContainer::getMisc();

@@ -677,6 +677,7 @@ $lang['strshowalltypes'] = 'Show all types';
 $lang['strnotype'] = 'No type found.';
 $lang['strnotypes'] = 'No types found.';
 $lang['strcreatetype'] = 'Create type';
+$lang['strcreatebasetype'] = 'Create base type';
 $lang['strcreatecomptype'] = 'Create composite type';
 $lang['strcreateenumtype'] = 'Create enum type';
 $lang['strtypeneedsfield'] = 'You must specify at least one field.';

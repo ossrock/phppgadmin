@@ -528,7 +528,7 @@ textarea.monospace {
 	font-size: initial;
 }
 
-textarea.dbexport {
+.export-output {
 	width: 100%;
 	height: calc(100vh - 250px);
 	border: 1px solid #ccc;

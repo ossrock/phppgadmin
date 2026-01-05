@@ -46,12 +46,13 @@ class OperatorActions extends AbstractActions
                 oprright::pg_catalog.regtype AS oprrightname,
                 oprresult::pg_catalog.regtype AS resultname,
                 po.oprcanhash,
-                oprcanmerge,
+                po.oprcanmerge,
                 oprcom::pg_catalog.regoperator AS oprcom,
                 oprnegate::pg_catalog.regoperator AS oprnegate,
                 po.oprcode::pg_catalog.regproc AS oprcode,
                 po.oprrest::pg_catalog.regproc AS oprrest,
-                po.oprjoin::pg_catalog.regproc AS oprjoin
+                po.oprjoin::pg_catalog.regproc AS oprjoin,
+                pg_catalog.obj_description(po.oid, 'pg_operator') AS oprcomment
             FROM
                 pg_catalog.pg_operator po
             WHERE

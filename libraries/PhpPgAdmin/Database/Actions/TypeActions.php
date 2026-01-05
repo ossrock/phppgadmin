@@ -18,17 +18,18 @@ class TypeActions extends AbstractActions
         $this->connection->clean($typname);
 
         $sql = "SELECT
-				t.typtype,
-				t.typbyval,
-				t.typname,
-				t.typinput AS typin,
-				t.typoutput AS typout,
-				t.typlen,
-				t.typalign,
-				pu.usename AS typowner
+                t.typtype,
+                t.typbyval,
+                t.typname,
+                t.typinput AS typin,
+                t.typoutput AS typout,
+                t.typlen,
+                t.typalign,
+                pu.usename AS typowner,
+                pg_catalog.obj_description(t.oid, 'pg_type') AS typcomment
             FROM pg_type t
-				LEFT JOIN pg_catalog.pg_user pu ON t.typowner = pu.usesysid
-			WHERE typname='{$typname}'";
+                LEFT JOIN pg_catalog.pg_user pu ON t.typowner = pu.usesysid
+            WHERE typname='{$typname}'";
 
         return $this->connection->selectSet($sql);
     }
@@ -77,9 +78,9 @@ class TypeActions extends AbstractActions
     }
 
     /**
-     * Creates a new type.
+     * Creates a new base type.
      */
-    public function createType($typname, $typin, $typout, $typlen, $typdef, $typelem, $typdelim, $typbyval, $typalign, $typstorage)
+    public function createBaseType($typname, $typin, $typout, $typlen, $typdef, $typelem, $typdelim, $typbyval, $typalign, $typstorage)
     {
         $f_schema = $this->connection->_schema;
         $this->connection->fieldClean($f_schema);

@@ -426,6 +426,10 @@ td[class^="opbutton"] img.icon {
 	margin: 0 2px;
 }
 
+.crumb:last-child {
+	font-weight: bold;
+}
+
 table.tabs {
 	width: 100%;
 	border-collapse: collapse;

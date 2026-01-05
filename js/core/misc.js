@@ -276,7 +276,7 @@
 	/**
 	 * @param {HTMLElement} element
 	 */
-	const createSqlEditor = function (element) {
+	function createSqlEditor(element) {
 		if (element.classList.contains("ace_editor")) {
 			// Editor already created
 			return;
@@ -343,58 +343,12 @@
 			editor.container.style.height = newHeight + "px";
 			editor.resize();
 		}
-	};
+	}
 
 	/**
 	 * @param {HTMLElement} element
 	 */
-	const _createSqlViewer = function (element) {
-		if (element.classList.contains("ace_editor")) {
-			// Editor already created
-			return;
-		}
-		const editor = ace.edit(element);
-		//editor.session.setMode("ace/mode/pgsql");
-		const mode = element.dataset.mode || "pgsql";
-		editor.session.setMode("ace/mode/" + mode);
-		//editor.setTheme("ace/theme/tomorrow");
-		editor.setReadOnly(true);
-		editor.renderer.$cursorLayer.element.style.display = "none";
-		editor.renderer.setShowGutter(false);
-		editor.setHighlightActiveLine(false);
-		editor.setShowPrintMargin(false);
-		editor.session.setUseWrapMode(true);
-		editor.session.setWrapLimitRange(null, null);
-		editor.setOptions({
-			maxLines: Infinity,
-			highlightGutterLine: false,
-			showLineNumbers: true,
-			wrap: "free",
-			useWrapMode: true,
-		});
-
-		editor.on("blur", function () {
-			editor.clearSelection();
-		});
-
-		// Ace in Tabellenzellen stabilisieren
-		editor.renderer.setScrollMargin(0, 0, 0, 0);
-		editor.renderer.setOption("hScrollBarAlwaysVisible", false);
-		editor.renderer.setOption("vScrollBarAlwaysVisible", false);
-		editor.renderer.setOption("maxPixelWidth", 0);
-
-		// Trigger word wrap
-		editor.session.setUseWrapMode(true);
-		editor.setOption("wrap", "free");
-
-		// Layout fix
-		editor.resize(true);
-	};
-
-	/**
-	 * @param {HTMLElement} element
-	 */
-	const createSqlViewer = function (element) {
+	function createSqlViewer(element) {
 		if (element.dataset.hljsInitialized) {
 			return;
 		}
@@ -410,7 +364,7 @@
 			/"([\w.]+)"/g,
 			'<span class="hljs-quoted-identifier">"$1"</span>'
 		);
-	};
+	}
 
 	/**
 	 *
@@ -492,6 +446,8 @@
 	flatpickr.localize(flatpickr.l10ns.default);
 	//createSqlEditors(document.documentElement);
 	//createDateAndTimePickers(document.documentElement);
+	window.createSqlEditor = createSqlEditor;
+	window.createSqlViewer = createSqlViewer;
 
 	hljs.registerLanguage("pgsql", function (hljs) {
 		const base = hljs.getLanguage("pgsql");

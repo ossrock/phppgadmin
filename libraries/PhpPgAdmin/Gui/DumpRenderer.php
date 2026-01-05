@@ -123,7 +123,7 @@ class DumpRenderer
                         ?>
                         <div>
                             <input type="checkbox" id="db_<?= html_esc($dbName); ?>" name="databases[]"
-                                   value="<?= html_esc($dbName); ?>" <?= $checked; ?> />
+                                value="<?= html_esc($dbName); ?>" <?= $checked; ?> />
                             <label for="db_<?= html_esc($dbName); ?>">
                                 <img src="<?= $this->misc->icon('Database') ?>" class="icon">
                                 <?= html_esc($dbName); ?>
@@ -151,6 +151,20 @@ class DumpRenderer
                     <input type="checkbox" id="include_comments" name="include_comments" value="true" checked="checked" />
                     <label for="include_comments"><?= $this->lang['strincludeobjectcomments']; ?></label>
                 </div>
+                <?php if ($subject === 'database'): ?>
+                    <div>
+                        <input type="checkbox" id="suppress_create_database" name="suppress_create_database" value="true" />
+                        <label
+                            for="suppress_create_database"><?= $this->lang['strsuppressdbcreation'] ?? 'Suppress database creation'; ?></label>
+                    </div>
+                <?php endif; ?>
+                <?php if ($subject === 'schema'): ?>
+                    <div>
+                        <input type="checkbox" id="suppress_create_schema" name="suppress_create_schema" value="true" />
+                        <label
+                            for="suppress_create_schema"><?= $this->lang['strsuppressschemacreation'] ?? 'Suppress schema creation'; ?></label>
+                    </div>
+                <?php endif; ?>
             </fieldset>
 
             <!-- Output Format Selection (Unified with INSERT options for SQL) -->
@@ -278,6 +292,8 @@ class DumpRenderer
 
                 // Only setup if form elements exist on this page
                 if (whatRadios.length > 0 && structureOptions) {
+                    const suppressSchema = document.getElementById('suppress_create_schema');
+                    const suppressDb = document.getElementById('suppress_create_database');
                     function updateOptions() {
                         const selectedWhat = form.querySelector('input[name="what"]:checked').value;
                         const dumperValue = form.querySelector('input[name="dumper"]:checked').value;
@@ -385,6 +401,20 @@ class DumpRenderer
                             // If TRUNCATE is checked and pg_dump/pg_dumpall is enabled, uncheck it
                             if ((pgdumpSelected || pgdumpallSelected) && truncateTables.checked) {
                                 truncateTables.checked = false;
+                            }
+                        }
+
+                        // Disable suppression options when using pg_dump/pg_dumpall (handled by pg_dump)
+                        if (suppressSchema) {
+                            suppressSchema.disabled = pgdumpSelected || pgdumpallSelected;
+                            if (suppressSchema.disabled) {
+                                suppressSchema.checked = false;
+                            }
+                        }
+                        if (suppressDb) {
+                            suppressDb.disabled = pgdumpSelected || pgdumpallSelected;
+                            if (suppressDb.disabled) {
+                                suppressDb.checked = false;
                             }
                         }
 

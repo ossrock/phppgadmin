@@ -153,6 +153,7 @@ function doAlter($msg = '')
 	$typname = $typedata->fields['typname'];
 	$typtype = $typedata->fields['typtype'];
 	$typowner = $typedata->fields['typowner'];
+	$typcomment = $typedata->fields['typcomment'] ?? '';
 	//var_dump($typedata->fields);
 
 	// Initialize POST variables if not set
@@ -160,6 +161,8 @@ function doAlter($msg = '')
 		$_POST['name'] = $typname;
 	if (!isset($_POST['owner']))
 		$_POST['owner'] = $typowner;
+	if (!isset($_POST['typcomment']))
+		$_POST['typcomment'] = $typcomment;
 	if (!isset($_POST['newEnumValues']))
 		$_POST['newEnumValues'] = [];
 	if (!isset($_POST['renameEnumOld']))
@@ -189,6 +192,11 @@ function doAlter($msg = '')
 		}
 		echo "</select></td></tr>\n";
 	}
+
+	// Comment
+	echo "<tr><th class=\"data left\">{$lang['strcomment']}</th>\n";
+	echo "<td class=\"data1\"><input name=\"typcomment\" size=\"32\" maxlength=\"{$pg->_maxNameLen}\" value=\"",
+		html_esc($_POST['typcomment']), "\" /></td></tr>\n";
 
 	// Enum value management
 	if ($typtype === 'e' && $typeActions->hasEnumTypes()) {
@@ -337,6 +345,15 @@ function doSaveAlter()
 				}
 			}
 		}
+	}
+
+	// Update comment
+	$newComment = trim($_POST['typcomment'] ?? '');
+	$status = $pg->setComment('TYPE', $newName, '', $newComment, true);
+	if ($status != 0) {
+		$pg->rollbackTransaction();
+		doAlter($lang['strtypecreatedbad']);
+		return;
 	}
 
 	$pg->endTransaction();
@@ -658,7 +675,7 @@ function doCreateEnum($msg = '')
 /**
  * Displays a screen where they can enter a new type
  */
-function doCreate($msg = '')
+function doCreateBase($msg = '')
 {
 	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
@@ -749,7 +766,7 @@ function doCreate($msg = '')
 	}
 	echo "</select></td></tr>\n";
 	echo "</table>\n";
-	echo "<p><input type=\"hidden\" name=\"action\" value=\"save_create\" />\n";
+	echo "<p><input type=\"hidden\" name=\"action\" value=\"save_create_base\" />\n";
 	echo $misc->form;
 	echo "<input type=\"submit\" value=\"{$lang['strcreate']}\" />\n";
 	echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" /></p>\n";
@@ -757,9 +774,9 @@ function doCreate($msg = '')
 }
 
 /**
- * Actually creates the new type in the database
+ * Actually creates the new base type in the database
  */
-function doSaveCreate()
+function doSaveCreateBase()
 {
 	$pg = AppContainer::getPostgres();
 	$lang = AppContainer::getLang();
@@ -769,11 +786,11 @@ function doSaveCreate()
 	// Note: We're assuming they've given in and out functions here
 	// which might be unwise...
 	if ($_POST['typname'] == '')
-		doCreate($lang['strtypeneedsname']);
+		doCreateBase($lang['strtypeneedsname']);
 	elseif ($_POST['typlen'] == '')
-		doCreate($lang['strtypeneedslen']);
+		doCreateBase($lang['strtypeneedslen']);
 	else {
-		$status = $typeActions->createType(
+		$status = $typeActions->createBaseType(
 			$_POST['typname'],
 			$_POST['typin'],
 			$_POST['typout'],
@@ -788,7 +805,7 @@ function doSaveCreate()
 		if ($status == 0)
 			doDefault($lang['strtypecreated']);
 		else
-			doCreate($lang['strtypecreatedbad']);
+			doCreateBase($lang['strtypecreatedbad']);
 	}
 }
 
@@ -882,22 +899,22 @@ function doDefault($msg = '')
 	$misc->printTable($types, $columns, $actions, 'types-types', $lang['strnotypes']);
 
 	$navlinks = [
-		'create' => [
+		'create_enum' => [
 			'attr' => [
 				'href' => [
 					'url' => 'types.php',
 					'urlvars' => [
-						'action' => 'create',
+						'action' => 'create_enum',
 						'server' => $_REQUEST['server'],
 						'database' => $_REQUEST['database'],
 						'schema' => $_REQUEST['schema']
 					]
 				]
 			],
-			'icon' => $misc->icon('CreateType'),
-			'content' => $lang['strcreatetype']
+			'icon' => $misc->icon('CreateEnumType'),
+			'content' => $lang['strcreateenumtype']
 		],
-		'createcomp' => [
+		'create_comp' => [
 			'attr' => [
 				'href' => [
 					'url' => 'types.php',
@@ -912,21 +929,21 @@ function doDefault($msg = '')
 			'icon' => $misc->icon('CreateCompositeType'),
 			'content' => $lang['strcreatecomptype']
 		],
-		'createenum' => [
+		'create_base' => [
 			'attr' => [
 				'href' => [
 					'url' => 'types.php',
 					'urlvars' => [
-						'action' => 'create_enum',
+						'action' => 'create_base',
 						'server' => $_REQUEST['server'],
 						'database' => $_REQUEST['database'],
 						'schema' => $_REQUEST['schema']
 					]
 				]
 			],
-			'icon' => $misc->icon('CreateEnumType'),
-			'content' => $lang['strcreateenumtype']
-		]
+			'icon' => $misc->icon('CreateBaseType'),
+			'content' => $lang['strcreatebasetype']
+		],
 	];
 
 	if (!$roleActions->isSuperUser()) {
@@ -1000,14 +1017,14 @@ switch ($action) {
 		else
 			doCreateEnum();
 		break;
-	case 'save_create':
+	case 'save_create_base':
 		if (isset($_POST['cancel']))
 			doDefault();
 		else
-			doSaveCreate();
+			doSaveCreateBase();
 		break;
-	case 'create':
-		doCreate();
+	case 'create_base':
+		doCreateBase();
 		break;
 	case 'alter':
 		doAlter();
