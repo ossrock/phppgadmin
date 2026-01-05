@@ -151,8 +151,8 @@ $lang['strtheme'] = 'Thème';
 $lang['strcluster'] = 'Cluster';
 
 // Admin
-$lang['stradminondatabase'] = 'Les actions d\'administration suivantes s\'appliquent à l\'ensemble de la base de donnée %s.';
-$lang['stradminontable'] = 'Les actions d\'administration suivantes s\'appliquent à la table %s.';
+$lang['stradminondatabase'] = 'Les actions d\'administration suivantes s\'appliquent à l\'ensemble de la base de donnée "%s".';
+$lang['stradminontable'] = 'Les actions d\'administration suivantes s\'appliquent à la table "%s".';
 
 // User-supplied SQL history
 $lang['strhistory'] = 'Historique';

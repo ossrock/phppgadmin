@@ -208,7 +208,14 @@ class Postgres extends AbstractConnection
 				$sql .= "{$obj_name} ({$leftsql}, {$rightsql}) IS ";
 				break;
 			case 'AGGREGATE':
-				$sql .= "\"{$f_schema}\".\"{$obj_name}\" (\"{$basetype}\") IS ";
+				// Support NONE for argument type; types should be passed as type names (unquoted)
+				if ($basetype === null || $basetype === '') {
+					$basitypesql = 'NONE';
+				} else {
+					$this->clean($basetype);
+					$basitypesql = $basetype;
+				}
+				$sql .= "\"{$f_schema}\".\"{$obj_name}\" ({$basitypesql}) IS ";
 				break;
 			default:
 				return -1;

@@ -15,24 +15,27 @@ class AggregateActions extends AbstractActions
         $f_schema = $this->connection->_schema;
         $this->connection->fieldClean($f_schema);
         $this->connection->fieldClean($name);
-        $this->connection->fieldClean($basetype);
-        $this->connection->fieldClean($sfunc);
-        $this->connection->fieldClean($stype);
-        $this->connection->fieldClean($ffunc);
-        $this->connection->fieldClean($initcond);
-        $this->connection->fieldClean($sortop);
+
+        // Types and function names should be emitted unquoted (they may contain spaces
+        // like "double precision"), so clean them for safety but do not quote.
+        $this->connection->clean($basetype);
+        $this->connection->clean($sfunc);
+        $this->connection->clean($stype);
+        $this->connection->clean($ffunc);
+        $this->connection->clean($initcond);
+        $this->connection->clean($sortop);
 
         $this->connection->beginTransaction();
 
-        $sql = "CREATE AGGREGATE \"{$f_schema}\".\"{$name}\" (BASETYPE = \"{$basetype}\", SFUNC = \"{$sfunc}\", STYPE = \"{$stype}\"";
+        $sql = "CREATE AGGREGATE \"{$f_schema}\".\"{$name}\" (BASETYPE = {$basetype}, SFUNC = {$sfunc}, STYPE = {$stype}";
         if (trim($ffunc) != '') {
-            $sql .= ", FINALFUNC = \"{$ffunc}\"";
+            $sql .= ", FINALFUNC = {$ffunc}";
         }
         if (trim($initcond) != '') {
-            $sql .= ", INITCOND = \"{$initcond}\"";
+            $sql .= ", INITCOND = '{$initcond}'";
         }
         if (trim($sortop) != '') {
-            $sql .= ", SORTOP = \"{$sortop}\"";
+            $sql .= ", SORTOP = {$sortop}";
         }
         $sql .= ")";
 
@@ -58,7 +61,14 @@ class AggregateActions extends AbstractActions
      */
     public function renameAggregate($aggrschema, $aggrname, $aggrtype, $newaggrname)
     {
-        $sql = "ALTER AGGREGATE \"{$aggrschema}\"" . '.' . "\"{$aggrname}\" (\"{$aggrtype}\") RENAME TO \"{$newaggrname}\"";
+        // support NONE and unquoted type names (may contain spaces)
+        if ($aggrtype === null || $aggrtype === '') {
+            $typessql = 'NONE';
+        } else {
+            $this->connection->clean($aggrtype);
+            $typessql = $aggrtype;
+        }
+        $sql = "ALTER AGGREGATE \"{$aggrschema}\"." . "\"{$aggrname}\" ({$typessql}) RENAME TO \"{$newaggrname}\"";
         return $this->connection->execute($sql);
     }
 
@@ -70,9 +80,12 @@ class AggregateActions extends AbstractActions
         $f_schema = $this->connection->_schema;
         $this->connection->fieldClean($f_schema);
         $this->connection->fieldClean($aggrname);
-        $this->connection->fieldClean($aggrtype);
+        // Types may contain spaces; clean but don't quote
+        $this->connection->clean($aggrtype);
 
-        $sql = "DROP AGGREGATE \"{$f_schema}\".\"{$aggrname}\" (\"{$aggrtype}\")";
+        $typessql = ($aggrtype === null || $aggrtype === '') ? 'NONE' : $aggrtype;
+
+        $sql = "DROP AGGREGATE \"{$f_schema}\".\"{$aggrname}\" ({$typessql})";
         if ($cascade) {
             $sql .= " CASCADE";
         }
@@ -134,7 +147,9 @@ class AggregateActions extends AbstractActions
         $this->connection->fieldClean($f_schema);
         $this->connection->fieldClean($aggrname);
         $this->connection->fieldClean($newaggrowner);
-        $sql = "ALTER AGGREGATE \"{$f_schema}\".\"{$aggrname}\" (\"{$aggrtype}\") OWNER TO \"{$newaggrowner}\"";
+        $this->connection->clean($aggrtype);
+        $typessql = ($aggrtype === null || $aggrtype === '') ? 'NONE' : $aggrtype;
+        $sql = "ALTER AGGREGATE \"{$f_schema}\".\"{$aggrname}\" ({$typessql}) OWNER TO \"{$newaggrowner}\"";
         return $this->connection->execute($sql);
     }
 
@@ -147,7 +162,9 @@ class AggregateActions extends AbstractActions
         $this->connection->fieldClean($f_schema);
         $this->connection->fieldClean($aggrname);
         $this->connection->fieldClean($newaggrschema);
-        $sql = "ALTER AGGREGATE \"{$f_schema}\".\"{$aggrname}\" (\"{$aggrtype}\") SET SCHEMA  \"{$newaggrschema}\"";
+        $this->connection->clean($aggrtype);
+        $typessql = ($aggrtype === null || $aggrtype === '') ? 'NONE' : $aggrtype;
+        $sql = "ALTER AGGREGATE \"{$f_schema}\".\"{$aggrname}\" ({$typessql}) SET SCHEMA  \"{$newaggrschema}\"";
         return $this->connection->execute($sql);
     }
 

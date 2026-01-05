@@ -1,6 +1,9 @@
 <?php
 
 use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Database\Actions\DatabaseActions;
+use PhpPgAdmin\Database\Actions\SchemaActions;
+use PhpPgAdmin\Database\Postgres;
 
 /**
  * Class to manage reports.  Note how this class is designed to use
@@ -13,30 +16,42 @@ use PhpPgAdmin\Core\AbstractContext;
 class Reports extends AbstractContext
 {
 
-	// A database driver
-	var $driver;
-	var $conf;
+	/**
+	 * Database driver
+	 * @var Postgres
+	 */
+	private $driver;
+	/**
+	 * Configuration array
+	 * @var array
+	 */
+	private $conf;
 
 	/* Constructor */
 	function __construct(&$conf, &$status)
 	{
 		$this->conf = $conf;
+		$pg = $this->postgres();
+		$databaseActions = new DatabaseActions($pg);
 
 		// Check to see if the reports database exists
-		$rs = $this->data()->getDatabase($this->conf['reports_db']);
-		if ($rs->recordCount() != 1) $status = -1;
-		else {
-			// Create a new database access object.
-			$this->driver = $this->misc()->getDatabaseAccessor($this->conf['reports_db']);
-			// Reports database should have been created in public schema
-			$this->driver->setSchema($this->conf['reports_schema']);
-			$status = 0;
+		$rs = $databaseActions->getDatabase($this->conf['reports_db']);
+		if ($rs->recordCount() != 1) {
+			$status = -1;
+			return;
 		}
+
+		// Create a new database access object.
+		$this->driver = $this->misc()->getDatabaseAccessor($this->conf['reports_db']);
+		// Reports database should have been created in public schema
+		$schemaActions = new SchemaActions($this->driver);
+		$schemaActions->setSchema($this->conf['reports_schema']);
+		$status = 0;
 	}
 
 	/**
 	 * Finds all reports
-	 * @return A recordset
+	 * @return ADORecordSet A recordset
 	 */
 	function getReports()
 	{
@@ -45,7 +60,9 @@ class Reports extends AbstractContext
 			$server_info = $this->misc()->getServerInfo();
 			$filter['created_by'] = $server_info['username'];
 			$ops = ['created_by' => '='];
-		} else $filter = $ops = [];
+		} else {
+			$filter = $ops = [];
+		}
 
 		$sql = $this->driver->getSelectSQL(
 			$this->conf['reports_table'],
@@ -61,7 +78,7 @@ class Reports extends AbstractContext
 	/**
 	 * Finds a particular report
 	 * @param $report_id The ID of the report to find
-	 * @return A recordset
+	 * @return ADORecordSet A recordset
 	 */
 	function getReport($report_id)
 	{
@@ -78,12 +95,12 @@ class Reports extends AbstractContext
 
 	/**
 	 * Creates a report
-	 * @param $report_name The name of the report
-	 * @param $db_name The name of the database
-	 * @param $descr The comment on the report
-	 * @param $report_sql The SQL for the report
-	 * @param $paginate The report should be paginated
-	 * @return 0 success
+	 * @param string $report_name The name of the report
+	 * @param string $db_name The name of the database
+	 * @param string $descr The comment on the report
+	 * @param string $report_sql The SQL for the report
+	 * @param bool $paginate The report should be paginated
+	 * @return int 0 success
 	 */
 	function createReport($report_name, $db_name, $descr, $report_sql, $paginate)
 	{
@@ -95,7 +112,8 @@ class Reports extends AbstractContext
 			'report_sql' => $report_sql,
 			'paginate' => $paginate ? 'true' : 'false',
 		];
-		if ($descr != '') $temp['descr'] = $descr;
+		if ($descr != '')
+			$temp['descr'] = $descr;
 
 		return $this->driver->insert($this->conf['reports_table'], $temp);
 	}

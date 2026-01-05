@@ -326,6 +326,10 @@ tr[class^="data"] td.action-buttons a {
 	/*color: #fff !important;*/
 }
 
+span.op-button {
+	margin: 0 1px;
+}
+
 tr[class^="data"]:hover {
 	background-color: #ddd;
 }
@@ -687,6 +691,7 @@ tr[class^="data"] td img.icon {
 	margin-top: 2em;
 	margin-bottom: 2em;
 	font-size: 110%;
+	text-align: center;
 }
 
 a.fk img {

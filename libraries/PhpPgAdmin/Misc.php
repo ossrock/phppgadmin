@@ -11,6 +11,7 @@ use PhpPgAdmin\Database\Actions\ConstraintActions;
 use PhpPgAdmin\Database\Actions\SchemaActions;
 use PhpPgAdmin\Database\ArrayRecordSet;
 use PhpPgAdmin\Database\Connector;
+use PhpPgAdmin\Database\Postgres;
 use PhpPgAdmin\Gui\ConnectionSelector;
 use PhpPgAdmin\Gui\LayoutRenderer;
 use PhpPgAdmin\Gui\NavLinksRenderer;
@@ -162,7 +163,7 @@ class Misc extends AbstractContext
 
 	/**
 	 * Creates a database accessor
-	 * @return \Postgres
+	 * @return Postgres
 	 */
 	function getDatabaseAccessor($database, $server_id = null)
 	{
@@ -212,11 +213,6 @@ class Misc extends AbstractContext
 		$className = "\\PhpPgAdmin\\Database\\$driverName";
 		$postgres = new $className($connector->conn, $majorVersion);
 		$postgres->platform = $connector->platform;
-		AppContainer::setPostgres($postgres);
-
-		include_once('./classes/database/' . $driverName . '.php');
-		$data = new $driverName($connector->conn);
-		$data->platform = $connector->platform;
 
 		// we work on UTF-8 only encoding
 		$postgres->execute("SET client_encoding TO 'UTF-8'");
@@ -225,7 +221,7 @@ class Misc extends AbstractContext
 			$postgres->execute("SET bytea_output TO escape");
 		}
 
-		return $data;
+		return $postgres;
 	}
 
 	/**
@@ -1020,7 +1016,6 @@ class Misc extends AbstractContext
 
 		$_REQUEST['schema'] = $schema;
 		$this->setHREF();
-		$this->data()->_schema = $schema;
 		return 0;
 	}
 

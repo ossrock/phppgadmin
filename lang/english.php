@@ -183,8 +183,8 @@ $lang['strcluster'] = 'Cluster';
 $lang['strnewwindow'] = 'Open New Window';
 
 // Admin
-$lang['stradminondatabase'] = 'The following administrative tasks apply on the whole %s database.';
-$lang['stradminontable'] = 'The following administrative tasks apply on the table %s.';
+$lang['stradminondatabase'] = 'The following administrative tasks apply on the whole "%s" database.';
+$lang['stradminontable'] = 'The following administrative tasks apply on the table "%s".';
 
 // User-supplied SQL history
 $lang['strhistory'] = 'History';

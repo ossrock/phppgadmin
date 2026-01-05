@@ -385,8 +385,8 @@ if (empty($_ENV["SKIP_DB_CONNECTION"] ?? '')) {
 	require __DIR__ . '/adodb/adodb.inc.php';
 
 	// Connect to database and set the global $data variable
-	$data = $misc->getDatabaseAccessor($_curr_db);
-	AppContainer::setData($data);
+	$pg = $misc->getDatabaseAccessor($_curr_db);
+	AppContainer::setPostgres($pg);
 
 	// If schema is defined and database supports schemas, then set the
 	// schema explicitly.
@@ -397,6 +397,5 @@ if (empty($_ENV["SKIP_DB_CONNECTION"] ?? '')) {
 			echo $lang['strbadschema'];
 			exit;
 		}
-		$data->_schema = $_REQUEST['schema'];
 	}
 }

@@ -4,8 +4,7 @@ namespace PhpPgAdmin\Core;
 
 use PhpPgAdmin\Misc;
 use PhpPgAdmin\PluginManager;
-use Postgres as PostgresLegacy;
-use PhpPgAdmin\Database\Postgres as PostgresNew;
+use PhpPgAdmin\Database\Postgres;
 
 /**
  * Simple singleton container to hold shared application objects during
@@ -65,12 +64,7 @@ class AppContainer
 	private $misc;
 
 	/**
-	 * @var PostgresLegacy
-	 */
-	private $data;
-
-	/**
-	 * @var PostgresNew
+	 * @var Postgres
 	 */
 	private $postgres;
 
@@ -141,31 +135,16 @@ class AppContainer
 		return self::instance()->misc;
 	}
 
-	public static function setData(PostgresLegacy $data): void
-	{
-		self::instance()->data = $data;
-	}
-
-	/**
-	 * Old Postgres class for legacy code.
-	 * @return PostgresLegacy
-	 * @deprecated Please do not use! Use getPostgres() instead.
-	 */
-	public static function getData(): ?PostgresLegacy
-	{
-		return self::instance()->data;
-	}
-
-	public static function setPostgres(PostgresNew $pg): void
+	public static function setPostgres(Postgres $pg): void
 	{
 		self::instance()->postgres = $pg;
 	}
 
 	/**
 	 * New Postgres class for modern code.
-	 * @return PostgresNew
+	 * @return Postgres
 	 */
-	public static function getPostgres(): ?PostgresNew
+	public static function getPostgres(): ?Postgres
 	{
 		return self::instance()->postgres;
 	}

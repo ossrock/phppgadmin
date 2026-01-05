@@ -707,12 +707,16 @@ function doAdmin($type, $msg = '')
 			'field' => field('nspname'),
 			'url' => "redirect.php?subject=schema&amp;{$misc->href}&amp;",
 			'vars' => ['schema' => 'nspname'],
+			'icon' => 'Schema',
+			'class' => 'nowrap',
 		],
 		'relname' => [
 			'title' => $lang['strtable'],
 			'field' => field('relname'),
 			'url' => "redirect.php?subject=table&amp;{$misc->href}&amp;",
 			'vars' => ['table' => 'relname', 'schema' => 'nspname'],
+			'icon' => 'Table',
+			'class' => 'nowrap',
 		],
 		'autovacuum_enabled' => [
 			'title' => $lang['strenabled'],

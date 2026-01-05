@@ -795,9 +795,6 @@ function doEditColumns($confirm, $msg = '')
 	$renderer = new ColumnFormRenderer();
 
 	if ($confirm) {
-		$misc->printTrail('table');
-		$misc->printTitle($lang['stredit'], 'pg.column.alter');
-		$misc->printMsg($msg);
 
 		// Get selected columns from multi-action
 		$selectedColumns = [];
@@ -815,6 +812,10 @@ function doEditColumns($confirm, $msg = '')
 			doDefault($lang['strnoobjects']);
 			return;
 		}
+
+		$misc->printTrail('table');
+		$misc->printTitle($lang['stredit'], 'pg.column.alter');
+		$misc->printMsg($msg);
 
 		// Load column data for each selected column
 		$columns = [];
@@ -976,8 +977,6 @@ function doDropMultiple($confirm)
 	$columnActions = new ColumnActions($pg);
 
 	if ($confirm) {
-		$misc->printTrail('table');
-		$misc->printTitle($lang['strdrop'], 'pg.column.drop');
 
 		// Get selected columns
 		$selectedColumns = [];
@@ -994,6 +993,9 @@ function doDropMultiple($confirm)
 			doDefault($lang['strnoobjects']);
 			return;
 		}
+
+		$misc->printTrail('table');
+		$misc->printTitle($lang['strdrop'], 'pg.column.drop');
 
 		?>
 		<p><?= sprintf($lang['strconfdropcolumns'] ?? 'Are you sure you want to drop the selected %d column(s) from table %s?', count($selectedColumns), $misc->printVal($_REQUEST['table'])) ?>

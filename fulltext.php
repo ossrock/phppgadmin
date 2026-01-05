@@ -1,6 +1,8 @@
 <?php
 
 use PhpPgAdmin\Core\AppContainer;
+use PhpPgAdmin\Database\Actions\FtsActions;
+use PhpPgAdmin\Gui\FormRenderer;
 
 /**
  * Manage fulltext configurations, dictionaries and mappings
@@ -11,21 +13,20 @@ use PhpPgAdmin\Core\AppContainer;
 // Include application functions
 include_once('./libraries/bootstrap.php');
 
-$action = $_REQUEST['action'] ?? '';
-if (!isset($msg)) $msg = '';
 
 function doDefault($msg = '')
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
 	$misc->printTrail('schema');
 	$misc->printTabs('schema', 'fulltext');
 	$misc->printTabs('fulltext', 'ftsconfigs');
 	$misc->printMsg($msg);
 
-	$cfgs = $data->getFtsConfigurations(false);
+	$cfgs = $ftsActions->getFtsConfigurations(false);
 
 	$columns = [
 		'configuration' => [
@@ -91,6 +92,7 @@ function doDefault($msg = '')
 					]
 				]
 			],
+			'icon' => $misc->icon('CreateFtsCfg'),
 			'content' => $lang['strftscreateconfig']
 		]
 	];
@@ -100,10 +102,10 @@ function doDefault($msg = '')
 
 function doDropConfig($confirm)
 {
-	$data = AppContainer::getData();
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
 	if ($confirm) {
 		$misc->printTrail('ftscfg');
@@ -121,7 +123,10 @@ function doDropConfig($confirm)
 		echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" /></p>\n";
 		echo "</form>\n";
 	} else {
-		$status = $data->dropFtsConfiguration($_POST['ftscfg'], isset($_POST['cascade']));
+		$status = $ftsActions->dropFtsConfiguration(
+			$_POST['ftscfg'],
+			isset($_POST['cascade'])
+		);
 		if ($status == 0) {
 			AppContainer::setShouldReloadTree(true);
 			doDefault($lang['strftsconfigdropped']);
@@ -132,10 +137,10 @@ function doDropConfig($confirm)
 
 function doDropDict($confirm)
 {
-	$data = AppContainer::getData();
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
 	if ($confirm) {
 		$misc->printTrail('ftscfg'); // TODO: change to smth related to dictionary
@@ -155,7 +160,10 @@ function doDropDict($confirm)
 		echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" /></p>\n";
 		echo "</form>\n";
 	} else {
-		$status = $data->dropFtsDictionary($_POST['ftsdict'], isset($_POST['cascade']));
+		$status = $ftsActions->dropFtsDictionary(
+			$_POST['ftsdict'],
+			isset($_POST['cascade'])
+		);
 		if ($status == 0) {
 			AppContainer::setShouldReloadTree(true);
 			doViewDicts($lang['strftsdictdropped']);
@@ -169,24 +177,29 @@ function doDropDict($confirm)
  */
 function doCreateConfig($msg = '')
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
+	$formRenderer = new FormRenderer();
 
-	include_once('./classes/Gui.php');
+	//$server_info = $misc->getServerInfo();
 
-	$server_info = $misc->getServerInfo();
-
-	if (!isset($_POST['formName'])) $_POST['formName'] = '';
-	if (!isset($_POST['formParser'])) $_POST['formParser'] = '';
-	if (!isset($_POST['formTemplate'])) $_POST['formTemplate'] = '';
-	if (!isset($_POST['formWithMap'])) $_POST['formWithMap'] = '';
-	if (!isset($_POST['formComment'])) $_POST['formComment'] = '';
+	if (!isset($_POST['formName']))
+		$_POST['formName'] = '';
+	if (!isset($_POST['formParser']))
+		$_POST['formParser'] = '';
+	if (!isset($_POST['formTemplate']))
+		$_POST['formTemplate'] = '';
+	if (!isset($_POST['formWithMap']))
+		$_POST['formWithMap'] = '';
+	if (!isset($_POST['formComment']))
+		$_POST['formComment'] = '';
 
 	// Fetch all FTS configurations from the database
-	$ftscfgs = $data->getFtsConfigurations();
+	$ftscfgs = $ftsActions->getFtsConfigurations();
 	// Fetch all FTS parsers from the database
-	$ftsparsers = $data->getFtsParsers();
+	$ftsparsers = $ftsActions->getFtsParsers();
 
 	$misc->printTrail('schema');
 	$misc->printTitle($lang['strftscreateconfig'], 'pg.ftscfg.create');
@@ -196,8 +209,8 @@ function doCreateConfig($msg = '')
 	echo "<table>\n";
 	/* conf name */
 	echo "\t<tr>\n\t\t<th class=\"data left required\">{$lang['strname']}</th>\n";
-	echo "\t\t<td class=\"data1\"><input name=\"formName\" size=\"32\" maxlength=\"{$data->_maxNameLen}\" value=\"",
-	html_esc($_POST['formName']), "\" /></td>\n\t</tr>\n";
+	echo "\t\t<td class=\"data1\"><input name=\"formName\" size=\"32\" maxlength=\"{$pg->_maxNameLen}\" value=\"",
+		html_esc($_POST['formName']), "\" /></td>\n\t</tr>\n";
 
 	// Template
 	echo "\t<tr>\n\t\t<th class=\"data left\">{$lang['strftstemplate']}</th>\n";
@@ -206,8 +219,8 @@ function doCreateConfig($msg = '')
 	$tpls = [];
 	$tplsel = '';
 	while (!$ftscfgs->EOF) {
-		$data->fieldClean($ftscfgs->fields['schema']);
-		$data->fieldClean($ftscfgs->fields['name']);
+		$pg->fieldClean($ftscfgs->fields['schema']);
+		$pg->fieldClean($ftscfgs->fields['name']);
 		$tplname = $ftscfgs->fields['schema'] . '.' . $ftscfgs->fields['name'];
 		$tpls[$tplname] = serialize([
 			'name' => $ftscfgs->fields['name'],
@@ -218,7 +231,13 @@ function doCreateConfig($msg = '')
 		}
 		$ftscfgs->moveNext();
 	}
-	echo \PhpPgAdmin\Gui::printCombo($tpls, 'formTemplate', true, $tplsel, false);
+	echo $formRenderer->printCombo(
+		$tpls,
+		'formTemplate',
+		true,
+		$tplsel,
+		false
+	);
 	echo "\n\t\t</td>\n\t</tr>\n";
 
 	// Parser
@@ -227,8 +246,8 @@ function doCreateConfig($msg = '')
 	$ftsparsers_ = [];
 	$ftsparsel = '';
 	while (!$ftsparsers->EOF) {
-		$data->fieldClean($ftsparsers->fields['schema']);
-		$data->fieldClean($ftsparsers->fields['name']);
+		$pg->fieldClean($ftsparsers->fields['schema']);
+		$pg->fieldClean($ftsparsers->fields['name']);
 		$parsername = $ftsparsers->fields['schema'] . '.' . $ftsparsers->fields['name'];
 
 		$ftsparsers_[$parsername] = serialize([
@@ -240,13 +259,19 @@ function doCreateConfig($msg = '')
 		}
 		$ftsparsers->moveNext();
 	}
-	echo \PhpPgAdmin\Gui::printCombo($ftsparsers_, 'formParser', true, $ftsparsel, false);
+	echo $formRenderer->printCombo(
+		$ftsparsers_,
+		'formParser',
+		true,
+		$ftsparsel,
+		false
+	);
 	echo "\n\t\t</td>\n\t</tr>\n";
 
 	// Comment
 	echo "\t<tr>\n\t\t<th class=\"data left\">{$lang['strcomment']}</th>\n";
 	echo "\t\t<td class=\"data1\"><textarea name=\"formComment\" rows=\"3\" cols=\"32\">",
-	html_esc($_POST['formComment']), "</textarea></td>\n\t</tr>\n";
+		html_esc($_POST['formComment']), "</textarea></td>\n\t</tr>\n";
 
 	echo "</table>\n";
 	echo "<p>\n";
@@ -264,22 +289,35 @@ function doCreateConfig($msg = '')
  */
 function doSaveCreateConfig()
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
 	$err = '';
 	// Check that they've given a name
-	if ($_POST['formName'] == '') $err .= "{$lang['strftsconfigneedsname']}<br />";
-	if (($_POST['formParser'] != '') && ($_POST['formTemplate'] != '')) $err .= "{$lang['strftscantparsercopy']}<br />";
+	if ($_POST['formName'] == '')
+		$err .= "{$lang['strftsconfigneedsname']}<br />";
+	if (($_POST['formParser'] != '') && ($_POST['formTemplate'] != ''))
+		$err .= "{$lang['strftscantparsercopy']}<br />";
 
-	if ($err != '') return doCreateConfig($err);
+	if ($err != '')
+		return doCreateConfig($err);
 
-	if ($_POST['formParser'] != '') $formParser = unserialize($_POST['formParser']);
-	else $formParser = '';
-	if ($_POST['formTemplate'] != '') $formTemplate = unserialize($_POST['formTemplate']);
-	else $formTemplate = '';
+	if ($_POST['formParser'] != '')
+		$formParser = unserialize($_POST['formParser']);
+	else
+		$formParser = '';
+	if ($_POST['formTemplate'] != '')
+		$formTemplate = unserialize($_POST['formTemplate']);
+	else
+		$formTemplate = '';
 
-	$status = $data->createFtsConfiguration($_POST['formName'], $formParser, $formTemplate, $_POST['formComment']);
+	$status = $ftsActions->createFtsConfiguration(
+		$_POST['formName'],
+		$formParser,
+		$formTemplate,
+		$_POST['formComment']
+	);
 	if ($status == 0) {
 		AppContainer::setShouldReloadTree(true);
 		doDefault($lang['strftsconfigcreated']);
@@ -292,23 +330,28 @@ function doSaveCreateConfig()
  */
 function doAlterConfig($msg = '')
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
 	$misc->printTrail('ftscfg');
 	$misc->printTitle($lang['stralter'], 'pg.ftscfg.alter');
 	$misc->printMsg($msg);
 
-	$ftscfg = $data->getFtsConfigurationByName($_REQUEST['ftscfg']);
+	$ftscfg = $ftsActions->getFtsConfigurationByName($_REQUEST['ftscfg']);
 	if ($ftscfg->recordCount() > 0) {
-		if (!isset($_POST['formComment'])) $_POST['formComment'] = $ftscfg->fields['comment'];
-		if (!isset($_POST['ftscfg'])) $_POST['ftscfg'] = $_REQUEST['ftscfg'];
-		if (!isset($_POST['formName'])) $_POST['formName'] = $_REQUEST['ftscfg'];
-		if (!isset($_POST['formParser'])) $_POST['formParser'] = '';
+		if (!isset($_POST['formComment']))
+			$_POST['formComment'] = $ftscfg->fields['comment'];
+		if (!isset($_POST['ftscfg']))
+			$_POST['ftscfg'] = $_REQUEST['ftscfg'];
+		if (!isset($_POST['formName']))
+			$_POST['formName'] = $_REQUEST['ftscfg'];
+		if (!isset($_POST['formParser']))
+			$_POST['formParser'] = '';
 
 		// Fetch all FTS parsers from the database
-		$ftsparsers = $data->getFtsParsers();
+		$ftsparsers = $ftsActions->getFtsParsers();
 
 		echo "<form action=\"fulltext.php\" method=\"post\">\n";
 		echo "<table>\n";
@@ -316,8 +359,8 @@ function doAlterConfig($msg = '')
 		echo "\t<tr>\n";
 		echo "\t\t<th class=\"data left required\">{$lang['strname']}</th>\n";
 		echo "\t\t<td class=\"data1\">";
-		echo "\t\t\t<input name=\"formName\" size=\"32\" maxlength=\"{$data->_maxNameLen}\" value=\"",
-		html_esc($_POST['formName']), "\" />\n";
+		echo "\t\t\t<input name=\"formName\" size=\"32\" maxlength=\"{$pg->_maxNameLen}\" value=\"",
+			html_esc($_POST['formName']), "\" />\n";
 		echo "\t\t</td>\n";
 		echo "\t</tr>\n";
 
@@ -343,11 +386,15 @@ function doAlterConfig($msg = '')
  */
 function doSaveAlterConfig()
 {
-	$data = AppContainer::getData();
-	$misc = AppContainer::getMisc();
+	$pg = AppContainer::getPostgres();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
-	$status = $data->updateFtsConfiguration($_POST['ftscfg'], $_POST['formComment'], $_POST['formName']);
+	$status = $ftsActions->updateFtsConfiguration(
+		$_POST['ftscfg'],
+		$_POST['formComment'],
+		$_POST['formName']
+	);
 	if ($status == 0)
 		doDefault($lang['strftsconfigaltered']);
 	else
@@ -359,16 +406,17 @@ function doSaveAlterConfig()
  */
 function doViewParsers($msg = '')
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
 	$misc->printTrail('schema');
 	$misc->printTabs('schema', 'fulltext');
 	$misc->printTabs('fulltext', 'ftsparsers');
 	$misc->printMsg($msg);
 
-	$parsers = $data->getFtsParsers(false);
+	$parsers = $ftsActions->getFtsParsers(false);
 
 	$columns = [
 		'schema' => [
@@ -398,16 +446,17 @@ function doViewParsers($msg = '')
  */
 function doViewDicts($msg = '')
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
 	$misc->printTrail('schema');
 	$misc->printTabs('schema', 'fulltext');
 	$misc->printTabs('fulltext', 'ftsdicts');
 	$misc->printMsg($msg);
 
-	$dicts = $data->getFtsDictionaries(false);
+	$dicts = $ftsActions->getFtsDictionaries(false);
 
 	$columns = [
 		'schema' => [
@@ -471,6 +520,7 @@ function doViewDicts($msg = '')
 					]
 				]
 			],
+			'icon' => $misc->icon('CreateFtsDict'),
 			'content' => $lang['strftscreatedict']
 		]
 	];
@@ -484,9 +534,10 @@ function doViewDicts($msg = '')
  */
 function doViewConfig($ftscfg, $msg = '')
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
 	$misc->printTrail('ftscfg');
 	$misc->printTabs('schema', 'fulltext');
@@ -495,7 +546,7 @@ function doViewConfig($ftscfg, $msg = '')
 
 	echo "<h3>{$lang['strftsconfigmap']}</h3>\n";
 
-	$map = $data->getFtsConfigurationMap($ftscfg);
+	$map = $ftsActions->getFtsConfigurationMap($ftscfg);
 
 	$columns = [
 		'name' => [
@@ -582,24 +633,30 @@ function doViewConfig($ftscfg, $msg = '')
  */
 function doCreateDict($msg = '')
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
-	include_once('./classes/Gui.php');
+	//$server_info = $misc->getServerInfo();
 
-	$server_info = $misc->getServerInfo();
-
-	if (!isset($_POST['formName'])) $_POST['formName'] = '';
-	if (!isset($_POST['formIsTemplate'])) $_POST['formIsTemplate'] = false;
-	if (!isset($_POST['formTemplate'])) $_POST['formTemplate'] = '';
-	if (!isset($_POST['formLexize'])) $_POST['formLexize'] = '';
-	if (!isset($_POST['formInit'])) $_POST['formInit'] = '';
-	if (!isset($_POST['formOption'])) $_POST['formOption'] = '';
-	if (!isset($_POST['formComment'])) $_POST['formComment'] = '';
+	if (!isset($_POST['formName']))
+		$_POST['formName'] = '';
+	if (!isset($_POST['formIsTemplate']))
+		$_POST['formIsTemplate'] = false;
+	if (!isset($_POST['formTemplate']))
+		$_POST['formTemplate'] = '';
+	if (!isset($_POST['formLexize']))
+		$_POST['formLexize'] = '';
+	if (!isset($_POST['formInit']))
+		$_POST['formInit'] = '';
+	if (!isset($_POST['formOption']))
+		$_POST['formOption'] = '';
+	if (!isset($_POST['formComment']))
+		$_POST['formComment'] = '';
 
 	// Fetch all FTS dictionaries from the database
-	$ftstpls = $data->getFtsDictionaryTemplates();
+	$ftstpls = $ftsActions->getFtsDictionaryTemplates();
 
 	$misc->printTrail('schema');
 	// TODO: create doc links
@@ -609,10 +666,10 @@ function doCreateDict($msg = '')
 	echo "<form action=\"fulltext.php\" method=\"post\">\n";
 	echo "<table>\n";
 	echo "\t<tr>\n\t\t<th class=\"data left required\">{$lang['strname']}</th>\n";
-	echo "\t\t<td class=\"data1\"><input name=\"formName\" size=\"32\" maxlength=\"{$data->_maxNameLen}\" value=\"",
-	html_esc($_POST['formName']), "\" />&nbsp;",
-	"<input type=\"checkbox\" name=\"formIsTemplate\" id=\"formIsTemplate\"", $_POST['formIsTemplate'] ? ' checked="checked" ' : '', " />\n",
-	"<label for=\"formIsTemplate\">{$lang['strftscreatedicttemplate']}</label></td>\n\t</tr>\n";
+	echo "\t\t<td class=\"data1\"><input name=\"formName\" size=\"32\" maxlength=\"{$pg->_maxNameLen}\" value=\"",
+		html_esc($_POST['formName']), "\" />&nbsp;",
+		"<input type=\"checkbox\" name=\"formIsTemplate\" id=\"formIsTemplate\"", $_POST['formIsTemplate'] ? ' checked="checked" ' : '', " />\n",
+		"<label for=\"formIsTemplate\">{$lang['strftscreatedicttemplate']}</label></td>\n\t</tr>\n";
 
 	// Template
 	echo "\t<tr>\n\t\t<th class=\"data left\">{$lang['strftstemplate']}</th>\n";
@@ -620,8 +677,8 @@ function doCreateDict($msg = '')
 	$tpls = [];
 	$tplsel = '';
 	while (!$ftstpls->EOF) {
-		$data->fieldClean($ftstpls->fields['schema']);
-		$data->fieldClean($ftstpls->fields['name']);
+		$pg->fieldClean($ftstpls->fields['schema']);
+		$pg->fieldClean($ftstpls->fields['name']);
 		$tplname = $ftstpls->fields['schema'] . '.' . $ftstpls->fields['name'];
 		$tpls[$tplname] = serialize([
 			'name' => $ftstpls->fields['name'],
@@ -632,31 +689,38 @@ function doCreateDict($msg = '')
 		}
 		$ftstpls->moveNext();
 	}
-	echo \PhpPgAdmin\Gui::printCombo($tpls, 'formTemplate', true, $tplsel, false);
+	$formRenderer = new FormRenderer();
+	echo $formRenderer->printCombo(
+		$tpls,
+		'formTemplate',
+		true,
+		$tplsel,
+		false
+	);
 	echo "\n\t\t</td>\n\t</tr>\n";
 
 	// TODO: what about maxlengths?
 	// Lexize
 	echo "\t<tr>\n\t\t<th class=\"data left\">{$lang['strftslexize']}</th>\n";
 	echo "\t\t<td class=\"data1\"><input name=\"formLexize\" size=\"32\" maxlength=\"1000\" value=\"",
-	html_esc($_POST['formLexize']), "\" ", isset($_POST['formIsTemplate']) ? '' : ' disabled="disabled" ',
-	"/></td>\n\t</tr>\n";
+		html_esc($_POST['formLexize']), "\" ", isset($_POST['formIsTemplate']) ? '' : ' disabled="disabled" ',
+		"/></td>\n\t</tr>\n";
 
 	// Init
 	echo "\t<tr>\n\t\t<th class=\"data left\">{$lang['strftsinit']}</th>\n";
 	echo "\t\t<td class=\"data1\"><input name=\"formInit\" size=\"32\" maxlength=\"1000\" value=\"",
-	html_esc($_POST['formInit']), "\"", @$_POST['formIsTemplate'] ? '' : ' disabled="disabled" ',
-	"/></td>\n\t</tr>\n";
+		html_esc($_POST['formInit']), "\"", @$_POST['formIsTemplate'] ? '' : ' disabled="disabled" ',
+		"/></td>\n\t</tr>\n";
 
 	// Option
 	echo "\t<tr>\n\t\t<th class=\"data left\">{$lang['strftsoptionsvalues']}</th>\n";
 	echo "\t\t<td class=\"data1\"><input name=\"formOption\" size=\"32\" maxlength=\"1000\" value=\"",
-	html_esc($_POST['formOption']), "\" /></td>\n\t</tr>\n";
+		html_esc($_POST['formOption']), "\" /></td>\n\t</tr>\n";
 
 	// Comment
 	echo "\t<tr>\n\t\t<th class=\"data left\">{$lang['strcomment']}</th>\n";
 	echo "\t\t<td class=\"data1\"><textarea name=\"formComment\" rows=\"3\" cols=\"32\">",
-	html_esc($_POST['formComment']), "</textarea></td>\n\t</tr>\n";
+		html_esc($_POST['formComment']), "</textarea></td>\n\t</tr>\n";
 
 	echo "</table>\n";
 	echo "<p>\n";
@@ -667,7 +731,7 @@ function doCreateDict($msg = '')
 	echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" />\n";
 	echo "</p>\n";
 	echo "</form>\n",
-	"<script type=\"text/javascript\">				
+		"<script type=\"text/javascript\">				
 				function templateOpts() {
 					isTpl = document.getElementsByName('formIsTemplate')[0].checked;
 					document.getElementsByName('formTemplate')[0].disabled = isTpl;
@@ -687,23 +751,29 @@ function doCreateDict($msg = '')
  */
 function doSaveCreateDict()
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
 	// Check that they've given a name
-	if ($_POST['formName'] == '') doCreateDict($lang['strftsdictneedsname']);
+	if ($_POST['formName'] == '')
+		doCreateDict($lang['strftsdictneedsname']);
 	else {
 
-		if (!isset($_POST['formIsTemplate'])) $_POST['formIsTemplate'] = false;
+		if (!isset($_POST['formIsTemplate']))
+			$_POST['formIsTemplate'] = false;
 		if (isset($_POST['formTemplate']))
 			$formTemplate = unserialize($_POST['formTemplate']);
 		else
 			$formTemplate = '';
-		if (!isset($_POST['formLexize'])) $_POST['formLexize'] = '';
-		if (!isset($_POST['formInit'])) $_POST['formInit'] = '';
-		if (!isset($_POST['formOption'])) $_POST['formOption'] = '';
+		if (!isset($_POST['formLexize']))
+			$_POST['formLexize'] = '';
+		if (!isset($_POST['formInit']))
+			$_POST['formInit'] = '';
+		if (!isset($_POST['formOption']))
+			$_POST['formOption'] = '';
 
-		$status = $data->createFtsDictionary(
+		$status = $ftsActions->createFtsDictionary(
 			$_POST['formName'],
 			$_POST['formIsTemplate'],
 			$formTemplate,
@@ -726,19 +796,23 @@ function doSaveCreateDict()
  */
 function doAlterDict($msg = '')
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
 	$misc->printTrail('ftscfg'); // TODO: change to smth related to dictionary
 	$misc->printTitle($lang['stralter'], 'pg.ftsdict.alter');
 	$misc->printMsg($msg);
 
-	$ftsdict = $data->getFtsDictionaryByName($_REQUEST['ftsdict']);
+	$ftsdict = $ftsActions->getFtsDictionaryByName($_REQUEST['ftsdict']);
 	if ($ftsdict->recordCount() > 0) {
-		if (!isset($_POST['formComment'])) $_POST['formComment'] = $ftsdict->fields['comment'];
-		if (!isset($_POST['ftsdict'])) $_POST['ftsdict'] = $_REQUEST['ftsdict'];
-		if (!isset($_POST['formName'])) $_POST['formName'] = $_REQUEST['ftsdict'];
+		if (!isset($_POST['formComment']))
+			$_POST['formComment'] = $ftsdict->fields['comment'];
+		if (!isset($_POST['ftsdict']))
+			$_POST['ftsdict'] = $_REQUEST['ftsdict'];
+		if (!isset($_POST['formName']))
+			$_POST['formName'] = $_REQUEST['ftsdict'];
 
 		echo "<form action=\"fulltext.php\" method=\"post\">\n";
 		echo "<table>\n";
@@ -746,8 +820,8 @@ function doAlterDict($msg = '')
 		echo "\t<tr>\n";
 		echo "\t\t<th class=\"data left required\">{$lang['strname']}</th>\n";
 		echo "\t\t<td class=\"data1\">";
-		echo "\t\t\t<input name=\"formName\" size=\"32\" maxlength=\"{$data->_maxNameLen}\" value=\"",
-		html_esc($_POST['formName']), "\" />\n";
+		echo "\t\t\t<input name=\"formName\" size=\"32\" maxlength=\"{$pg->_maxNameLen}\" value=\"",
+			html_esc($_POST['formName']), "\" />\n";
 		echo "\t\t</td>\n";
 		echo "\t</tr>\n";
 
@@ -774,11 +848,15 @@ function doAlterDict($msg = '')
  */
 function doSaveAlterDict()
 {
-	$data = AppContainer::getData();
-	$misc = AppContainer::getMisc();
+	$pg = AppContainer::getPostgres();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
-	$status = $data->updateFtsDictionary($_POST['ftsdict'], $_POST['formComment'], $_POST['formName']);
+	$status = $ftsActions->updateFtsDictionary(
+		$_POST['ftsdict'],
+		$_POST['formComment'],
+		$_POST['formName']
+	);
 	if ($status == 0)
 		doViewDicts($lang['strftsdictaltered']);
 	else
@@ -790,10 +868,10 @@ function doSaveAlterDict()
  */
 function doDropMapping($confirm)
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
-	global $_reload_drop_database;
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
 	if (empty($_REQUEST['mapping']) && empty($_REQUEST['ma'])) {
 		doDefault($lang['strftsspecifymappingtodrop']);
@@ -834,14 +912,22 @@ function doDropMapping($confirm)
 	} else {
 		// Case of multiaction drop
 		if (is_array($_REQUEST['mapping'])) {
-			$status = $data->changeFtsMapping($_REQUEST['ftscfg'], $_REQUEST['mapping'], 'drop');
+			$status = $ftsActions->changeFtsMapping(
+				$_REQUEST['ftscfg'],
+				$_REQUEST['mapping'],
+				'drop'
+			);
 			if ($status != 0) {
 				doViewConfig($_REQUEST['ftscfg'], $lang['strftsmappingdroppedbad']);
 				return;
 			}
 			doViewConfig($_REQUEST['ftscfg'], $lang['strftsmappingdropped']);
 		} else {
-			$status = $data->changeFtsMapping($_REQUEST['ftscfg'], [$_REQUEST['mapping']], 'drop');
+			$status = $ftsActions->changeFtsMapping(
+				$_REQUEST['ftscfg'],
+				[$_REQUEST['mapping']],
+				'drop'
+			);
 			if ($status == 0) {
 				doViewConfig($_REQUEST['ftscfg'], $lang['strftsmappingdropped']);
 			} else {
@@ -853,19 +939,23 @@ function doDropMapping($confirm)
 
 function doAlterMapping($msg = '')
 {
-	$data = AppContainer::getData();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$pg = AppContainer::getPostgres();
+	$ftsActions = new FtsActions($pg);
 
 	$misc->printTrail('ftscfg');
 	$misc->printTitle($lang['stralter'], 'pg.ftscfg.alter');
 	$misc->printMsg($msg);
 
-	$ftsdicts = $data->getFtsDictionaries();
+	$ftsdicts = $ftsActions->getFtsDictionaries();
 	if ($ftsdicts->recordCount() > 0) {
-		if (!isset($_POST['formMapping'])) $_POST['formMapping'] = @$_REQUEST['mapping'];
-		if (!isset($_POST['formDictionary'])) $_POST['formDictionary'] = '';
-		if (!isset($_POST['ftscfg'])) $_POST['ftscfg'] = $_REQUEST['ftscfg'];
+		if (!isset($_POST['formMapping']))
+			$_POST['formMapping'] = @$_REQUEST['mapping'];
+		if (!isset($_POST['formDictionary']))
+			$_POST['formDictionary'] = '';
+		if (!isset($_POST['ftscfg']))
+			$_POST['ftscfg'] = $_REQUEST['ftscfg'];
 
 		echo "<form action=\"fulltext.php\" method=\"post\">\n";
 
@@ -881,12 +971,18 @@ function doAlterMapping($msg = '')
 			foreach ($_REQUEST['ma'] as $v) {
 				$a = unserialize(htmlspecialchars_decode($v, ENT_QUOTES));
 				printf('<input type="hidden" name="formMapping[]" value="%s" />', html_esc($a['mapping']));
-				$ma_mappings[] = $data->getFtsMappingByName($_POST['ftscfg'], $a['mapping']);
+				$ma_mappings[] = $ftsActions->getFtsMappingByName(
+					$_POST['ftscfg'],
+					$a['mapping']
+				);
 				$ma_mappings_names[] = $a['mapping'];
 			}
 			echo implode(", ", $ma_mappings_names);
 		} else {
-			$mapping = $data->getFtsMappingByName($_POST['ftscfg'], $_POST['formMapping']);
+			$mapping = $ftsActions->getFtsMappingByName(
+				$_POST['ftscfg'],
+				$_POST['formMapping']
+			);
 			echo $mapping->fields['name'];
 			echo "<input type=\"hidden\" name=\"formMapping\" value=\"", html_esc($_POST['formMapping']), "\" />\n";
 		}
@@ -928,12 +1024,20 @@ function doAlterMapping($msg = '')
  */
 function doSaveAlterMapping()
 {
-	$data = AppContainer::getData();
-	$misc = AppContainer::getMisc();
+	$pg = AppContainer::getPostgres();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
-	$mappingArray = (is_array($_POST['formMapping']) ? $_POST['formMapping'] : [$_POST['formMapping']]);
-	$status = $data->changeFtsMapping($_POST['ftscfg'], $mappingArray, 'alter', $_POST['formDictionary']);
+	$mappingArray = $_POST['formMapping'];
+	if (!is_array($mappingArray)) {
+		$mappingArray = [$mappingArray];
+	}
+	$status = $ftsActions->changeFtsMapping(
+		$_POST['ftscfg'],
+		$mappingArray,
+		'alter',
+		$_POST['formDictionary']
+	);
 	if ($status == 0)
 		doViewConfig($_POST['ftscfg'], $lang['strftsmappingaltered']);
 	else
@@ -945,20 +1049,24 @@ function doSaveAlterMapping()
  */
 function doAddMapping($msg = '')
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
 	$misc->printTrail('ftscfg');
 	$misc->printTitle($lang['stralter'], 'pg.ftscfg.alter');
 	$misc->printMsg($msg);
 
-	$ftsdicts = $data->getFtsDictionaries();
+	$ftsdicts = $ftsActions->getFtsDictionaries();
 	if ($ftsdicts->recordCount() > 0) {
-		if (!isset($_POST['formMapping'])) $_POST['formMapping'] = '';
-		if (!isset($_POST['formDictionary'])) $_POST['formDictionary'] = '';
-		if (!isset($_POST['ftscfg'])) $_POST['ftscfg'] = $_REQUEST['ftscfg'];
-		$mappings = $data->getFtsMappings($_POST['ftscfg']);
+		if (!isset($_POST['formMapping']))
+			$_POST['formMapping'] = '';
+		if (!isset($_POST['formDictionary']))
+			$_POST['formDictionary'] = '';
+		if (!isset($_POST['ftscfg']))
+			$_POST['ftscfg'] = $_REQUEST['ftscfg'];
+		$mappings = $ftsActions->getFtsMappings($_POST['ftscfg']);
 
 		echo "<form action=\"fulltext.php\" method=\"post\">\n";
 		echo "<table>\n";
@@ -970,7 +1078,7 @@ function doAddMapping($msg = '')
 			$mapping = html_esc($mappings->fields['name']);
 			$mapping_desc = html_esc($mappings->fields['description']);
 			echo "\t\t\t\t<option value=\"{$mapping}\"",
-			$mapping == $_POST['formMapping'] ? ' selected="selected"' : '', ">{$mapping}", $mapping_desc ? " - {$mapping_desc}" : "", "</option>\n";
+				$mapping == $_POST['formMapping'] ? ' selected="selected"' : '', ">{$mapping}", $mapping_desc ? " - {$mapping_desc}" : "", "</option>\n";
 			$mappings->moveNext();
 		}
 		echo "\t\t</td>\n";
@@ -985,7 +1093,7 @@ function doAddMapping($msg = '')
 		while (!$ftsdicts->EOF) {
 			$ftsdict = html_esc($ftsdicts->fields['name']);
 			echo "\t\t\t\t<option value=\"{$ftsdict}\"",
-			$ftsdict == $_POST['formDictionary'] ? ' selected="selected"' : '', ">{$ftsdict}</option>\n";
+				$ftsdict == $_POST['formDictionary'] ? ' selected="selected"' : '', ">{$ftsdict}</option>\n";
 			$ftsdicts->moveNext();
 		}
 
@@ -1010,12 +1118,17 @@ function doAddMapping($msg = '')
  */
 function doSaveAddMapping()
 {
-	$data = AppContainer::getData();
-	$misc = AppContainer::getMisc();
+	$pg = AppContainer::getPostgres();
 	$lang = AppContainer::getLang();
+	$ftsActions = new FtsActions($pg);
 
 	$mappingArray = (is_array($_POST['formMapping']) ? $_POST['formMapping'] : [$_POST['formMapping']]);
-	$status = $data->changeFtsMapping($_POST['ftscfg'], $mappingArray, 'add', $_POST['formDictionary']);
+	$status = $ftsActions->changeFtsMapping(
+		$_POST['ftscfg'],
+		$mappingArray,
+		'add',
+		$_POST['formDictionary']
+	);
 	if ($status == 0)
 		doViewConfig($_POST['ftscfg'], $lang['strftsmappingadded']);
 	else
@@ -1028,8 +1141,8 @@ function doSaveAddMapping()
 function doTree()
 {
 	$misc = AppContainer::getMisc();
-	$data = AppContainer::getData();
-	$lang = AppContainer::getLang();
+	//$pg = AppContainer::getPostgres();
+	//$ftsActions = new FtsActions($pg);
 
 	$tabs = $misc->getNavTabs('fulltext');
 	$items = $misc->adjustTabsForTree($tabs);
@@ -1062,20 +1175,20 @@ function doTree()
 function doSubTree($what)
 {
 	$misc = AppContainer::getMisc();
-	$data = AppContainer::getData();
-	$lang = AppContainer::getLang();
+	$pg = AppContainer::getPostgres();
+	$ftsActions = new FtsActions($pg);
 
 	switch ($what) {
 		case 'FtsCfg':
-			$items = $data->getFtsConfigurations(false);
+			$items = $ftsActions->getFtsConfigurations(false);
 			$urlvars = ['action' => 'viewconfig', 'ftscfg' => field('name')];
 			break;
 		case 'FtsDict':
-			$items = $data->getFtsDictionaries(false);
+			$items = $ftsActions->getFtsDictionaries(false);
 			$urlvars = ['action' => 'viewdicts'];
 			break;
 		case 'FtsParser':
-			$items = $data->getFtsParsers(false);
+			$items = $ftsActions->getFtsParsers(false);
 			$urlvars = ['action' => 'viewparsers'];
 			break;
 		default:
@@ -1111,9 +1224,18 @@ function doSubTree($what)
 	exit;
 }
 
+// Main program
 
-if ($action == 'tree') doTree();
-if ($action == 'subtree') doSubTree($_REQUEST['what']);
+$misc = AppContainer::getMisc();
+$lang = AppContainer::getLang();
+
+$action = $_REQUEST['action'] ?? '';
+
+
+if ($action == 'tree')
+	doTree();
+if ($action == 'subtree')
+	doSubTree($_REQUEST['what']);
 
 $misc->printHeader($lang['strschemas']);
 $misc->printBody();
@@ -1128,16 +1250,22 @@ if (isset($_POST['cancel'])) {
 
 switch ($action) {
 	case 'createconfig':
-		if (isset($_POST['create'])) doSaveCreateConfig();
-		else doCreateConfig();
+		if (isset($_POST['create']))
+			doSaveCreateConfig();
+		else
+			doCreateConfig();
 		break;
 	case 'alterconfig':
-		if (isset($_POST['alter'])) doSaveAlterConfig();
-		else doAlterConfig();
+		if (isset($_POST['alter']))
+			doSaveAlterConfig();
+		else
+			doAlterConfig();
 		break;
 	case 'dropconfig':
-		if (isset($_POST['drop'])) doDropConfig(false);
-		else doDropConfig(true);
+		if (isset($_POST['drop']))
+			doDropConfig(false);
+		else
+			doDropConfig(true);
 		break;
 	case 'viewconfig':
 		doViewConfig($_REQUEST['ftscfg']);
@@ -1149,28 +1277,40 @@ switch ($action) {
 		doViewDicts();
 		break;
 	case 'createdict':
-		if (isset($_POST['create'])) doSaveCreateDict();
-		else doCreateDict();
+		if (isset($_POST['create']))
+			doSaveCreateDict();
+		else
+			doCreateDict();
 		break;
 	case 'alterdict':
-		if (isset($_POST['alter'])) doSaveAlterDict();
-		else doAlterDict();
+		if (isset($_POST['alter']))
+			doSaveAlterDict();
+		else
+			doAlterDict();
 		break;
 	case 'dropdict':
-		if (isset($_POST['drop'])) doDropDict(false);
-		else doDropDict(true);
+		if (isset($_POST['drop']))
+			doDropDict(false);
+		else
+			doDropDict(true);
 		break;
 	case 'dropmapping':
-		if (isset($_POST['drop'])) doDropMapping(false);
-		else doDropMapping(true);
+		if (isset($_POST['drop']))
+			doDropMapping(false);
+		else
+			doDropMapping(true);
 		break;
 	case 'altermapping':
-		if (isset($_POST['alter'])) doSaveAlterMapping();
-		else doAlterMapping();
+		if (isset($_POST['alter']))
+			doSaveAlterMapping();
+		else
+			doAlterMapping();
 		break;
 	case 'addmapping':
-		if (isset($_POST['add'])) doSaveAddMapping();
-		else doAddMapping();
+		if (isset($_POST['add']))
+			doSaveAddMapping();
+		else
+			doAddMapping();
 		break;
 
 	default:

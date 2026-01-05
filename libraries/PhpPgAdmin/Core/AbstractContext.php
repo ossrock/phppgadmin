@@ -22,15 +22,6 @@ abstract class AbstractContext
 		return AppContainer::getConf();
 	}
 
-	/**
-	 * @deprecated please use postgres() instead
-	 * @return PostgresLegacy|null
-	 */
-	protected function data(): ?PostgresLegacy
-	{
-		return AppContainer::getData();
-	}
-
 	protected function postgres(): ?PostgresNew
 	{
 		return AppContainer::getPostgres();

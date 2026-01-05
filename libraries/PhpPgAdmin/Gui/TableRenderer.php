@@ -137,7 +137,7 @@ class TableRenderer extends AbstractContext
                                 echo "<span class=\"opbutton{$id} op-button\">";
                                 $action['fields'] = $tabledata->fields;
                                 $this->misc()->printLink($action);
-                                echo "</span> ";
+                                echo "</span>\n";
                             }
                             echo "</td>\n";
                             break;
@@ -204,7 +204,7 @@ class TableRenderer extends AbstractContext
                                 <?= $lang['strselectall'] ?>
                             </a>
                         </td>
-                        <td>&nbsp;---&gt;&nbsp;</td>
+                        <td>&nbsp;⮞&nbsp;</td>
                         <td>
                             <select name="action">
                                 <?php if ($ma['default'] == null): ?>
@@ -232,8 +232,8 @@ class TableRenderer extends AbstractContext
 
             return true;
         } else {
-            if (!is_null($nodata)) {
-                echo "<p>{$nodata}</p>\n";
+            if (!empty($nodata)) {
+                echo "<p class=\"nodata\">{$nodata}</p>\n";
             }
             return false;
         }

@@ -30,7 +30,7 @@ class TableDumper extends AbstractDumper
         }
 
         if (empty($options['data_only'])) {
-            $this->dumpConstraintsAndIndexes($table, $schema, $options);
+            $this->dumpIndexesTriggersRules($table, $schema, $options);
         }
     }
 
@@ -118,16 +118,54 @@ class TableDumper extends AbstractDumper
         }
     }
 
-    protected function dumpConstraintsAndIndexes($table, $schema, $options)
+    protected function dumpIndexesTriggersRules($table, $schema, $options)
     {
         $tableActions = new TableActions($this->connection);
         $suffix = $tableActions->getTableDefSuffix($table);
+
         if ($suffix) {
+            if (!empty($options['if_not_exists'])) {
+                // Indexes - support from Postgres 9.5 onwards
+                if ($this->connection->major_version >= 9.5) {
+                    $suffix = str_replace(
+                        'CREATE INDEX',
+                        'CREATE INDEX IF NOT EXISTS',
+                        $suffix
+                    );
+                    $suffix = str_replace(
+                        'CREATE UNIQUE INDEX',
+                        'CREATE UNIQUE INDEX IF NOT EXISTS',
+                        $suffix
+                    );
+                }
+
+                // Trigger - use OR REPLACE as emulation?
+                if ($this->connection->major_version >= 14) {
+                    $suffix = str_replace(
+                        'CREATE TRIGGER',
+                        'CREATE OR REPLACE TRIGGER',
+                        $suffix
+                    );
+                    $suffix = str_replace(
+                        'CREATE CONSTRAINT TRIGGER',
+                        'CREATE OR REPLACE CONSTRAINT TRIGGER',
+                        $suffix
+                    );
+                }
+
+                // Rules - use OR REPLACE as emulation?
+                $suffix = str_replace(
+                    'CREATE RULE',
+                    'CREATE OR REPLACE RULE',
+                    $suffix
+                );
+            }
             $this->write($suffix);
         }
 
         $this->writePrivileges($table, 'table', $schema);
     }
+
 
     /**
      * Get table data as an ADORecordSet for export formatting.

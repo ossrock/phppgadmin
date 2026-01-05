@@ -153,8 +153,8 @@ $lang['strtheme'] = 'Tema';
 $lang['strcluster'] = 'Clúster';
 
 // Admin
-$lang['stradminondatabase'] = 'Las siguientes tareas administrativas aplican a toda la base de datos %s.';
-$lang['stradminontable'] = 'Las siguientes tareas administrativas aplican a la tabla %s.';
+$lang['stradminondatabase'] = 'Las siguientes tareas administrativas aplican a toda la base de datos "%s".';
+$lang['stradminontable'] = 'Las siguientes tareas administrativas aplican a la tabla "%s".';
 
 // User-supplied SQL history
 $lang['strhistory'] = 'Historial';

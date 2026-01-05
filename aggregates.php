@@ -1,6 +1,7 @@
 <?php
 
 use PhpPgAdmin\Core\AppContainer;
+use PhpPgAdmin\Database\Actions\AggregateActions;
 
 /**
  * Manage aggregates in a database
@@ -11,17 +12,15 @@ use PhpPgAdmin\Core\AppContainer;
 // Include application functions
 include_once('./libraries/bootstrap.php');
 
-$action = $_REQUEST['action'] ?? '';
-if (!isset($msg)) $msg = '';
-
 /**
  * Actually creates the new aggregate in the database
  */
 function doSaveCreate()
 {
 
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$lang = AppContainer::getLang();
+	$aggregateActions = new AggregateActions($pg);
 
 	// Check inputs
 	if (trim($_REQUEST['name']) == '') {
@@ -38,7 +37,7 @@ function doSaveCreate()
 		return;
 	}
 
-	$status = $data->createAggregate(
+	$status = $aggregateActions->createAggregate(
 		$_REQUEST['name'],
 		$_REQUEST['basetype'],
 		$_REQUEST['sfunc'],
@@ -62,56 +61,82 @@ function doSaveCreate()
  */
 function doCreate($msg = '')
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
 
-	if (!isset($_REQUEST['name'])) $_REQUEST['name'] = '';
-	if (!isset($_REQUEST['basetype'])) $_REQUEST['basetype'] = '';
-	if (!isset($_REQUEST['sfunc'])) $_REQUEST['sfunc'] = '';
-	if (!isset($_REQUEST['stype'])) $_REQUEST['stype'] = '';
-	if (!isset($_REQUEST['ffunc'])) $_REQUEST['ffunc'] = '';
-	if (!isset($_REQUEST['initcond'])) $_REQUEST['initcond'] = '';
-	if (!isset($_REQUEST['sortop'])) $_REQUEST['sortop'] = '';
-	if (!isset($_REQUEST['aggrcomment'])) $_REQUEST['aggrcomment'] = '';
+	if (!isset($_REQUEST['name']))
+		$_REQUEST['name'] = '';
+	if (!isset($_REQUEST['basetype']))
+		$_REQUEST['basetype'] = '';
+	if (!isset($_REQUEST['sfunc']))
+		$_REQUEST['sfunc'] = '';
+	if (!isset($_REQUEST['stype']))
+		$_REQUEST['stype'] = '';
+	if (!isset($_REQUEST['ffunc']))
+		$_REQUEST['ffunc'] = '';
+	if (!isset($_REQUEST['initcond']))
+		$_REQUEST['initcond'] = '';
+	if (!isset($_REQUEST['sortop']))
+		$_REQUEST['sortop'] = '';
+	if (!isset($_REQUEST['aggrcomment']))
+		$_REQUEST['aggrcomment'] = '';
 
 	$misc->printTrail('schema');
 	$misc->printTitle($lang['strcreateaggregate'], 'pg.aggregate.create');
 	$misc->printMsg($msg);
-
-	echo "<form action=\"aggregates.php\" method=\"post\">\n";
-	echo "<table>\n";
-	echo "\t<tr>\n\t\t<th class=\"data left required\">{$lang['strname']}</th>\n";
-	echo "\t\t<td class=\"data\"><input name=\"name\" size=\"32\" maxlength=\"{$data->_maxNameLen}\" value=\"",
-	html_esc($_REQUEST['name']), "\" /></td>\n\t</tr>\n";
-	echo "\t<tr>\n\t\t<th class=\"data left required\">{$lang['straggrbasetype']}</th>\n";
-	echo "\t\t<td class=\"data\"><input name=\"basetype\" size=\"32\" maxlength=\"{$data->_maxNameLen}\" value=\"",
-	html_esc($_REQUEST['basetype']), "\" /></td>\n\t</tr>\n";
-	echo "\t<tr>\n\t\t<th class=\"data left required\">{$lang['straggrsfunc']}</th>\n";
-	echo "\t\t<td class=\"data\"><input name=\"sfunc\" size=\"32\" maxlength=\"{$data->_maxNameLen}\" value=\"",
-	html_esc($_REQUEST['sfunc']), "\" /></td>\n\t</tr>\n";
-	echo "\t<tr>\n\t\t<th class=\"data left required\">{$lang['straggrstype']}</th>\n";
-	echo "\t\t<td class=\"data\"><input name=\"stype\" size=\"32\" maxlength=\"{$data->_maxNameLen}\" value=\"",
-	html_esc($_REQUEST['stype']), "\" /></td>\n\t</tr>\n";
-	echo "\t<tr>\n\t\t<th class=\"data left\">{$lang['straggrffunc']}</th>\n";
-	echo "\t\t<td class=\"data\"><input name=\"ffunc\" size=\"32\" maxlength=\"{$data->_maxNameLen}\" value=\"",
-	html_esc($_REQUEST['ffunc']), "\" /></td>\n\t</tr>\n";
-	echo "\t<tr>\n\t\t<th class=\"data left\">{$lang['straggrinitcond']}</th>\n";
-	echo "\t\t<td class=\"data\"><input name=\"initcond\" size=\"32\" maxlength=\"{$data->_maxNameLen}\" value=\"",
-	html_esc($_REQUEST['initcond']), "\" /></td>\n\t</tr>\n";
-	echo "\t<tr>\n\t\t<th class=\"data left\">{$lang['straggrsortop']}</th>\n";
-	echo "\t\t<td class=\"data\"><input name=\"sortop\" size=\"32\" maxlength=\"{$data->_maxNameLen}\" value=\"",
-	html_esc($_REQUEST['sortop']), "\" /></td>\n\t</tr>\n";
-	echo "\t<tr>\n\t\t<th class=\"data left\">{$lang['strcomment']}</th>\n";
-	echo "\t\t<td><textarea name=\"aggrcomment\" rows=\"3\" cols=\"32\">",
-	html_esc($_REQUEST['aggrcomment']), "</textarea></td>\n\t</tr>\n";
-
-	echo "</table>\n";
-	echo "<p><input type=\"hidden\" name=\"action\" value=\"save_create\" />\n";
-	echo $misc->form;
-	echo "<input type=\"submit\" value=\"{$lang['strcreate']}\" />\n";
-	echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" /></p>\n";
-	echo "</form>\n";
+	?>
+	<form action="aggregates.php" method="post">
+		<table>
+			<tr>
+				<th class="data left required"><?= $lang['strname'] ?></th>
+				<td class="data"><input name="name" size="32" maxlength="<?= $pg->_maxNameLen ?>"
+						value="<?= html_esc($_REQUEST['name']) ?>" /></td>
+			</tr>
+			<tr>
+				<th class="data left required"><?= $lang['straggrbasetype'] ?></th>
+				<td class="data"><input name="basetype" size="32" maxlength="<?= $pg->_maxNameLen ?>"
+						value="<?= html_esc($_REQUEST['basetype']) ?>" /></td>
+			</tr>
+			<tr>
+				<th class="data left required"><?= $lang['straggrsfunc'] ?></th>
+				<td class="data"><input name="sfunc" size="32" maxlength="<?= $pg->_maxNameLen ?>"
+						value="<?= html_esc($_REQUEST['sfunc']) ?>" /></td>
+			</tr>
+			<tr>
+				<th class="data left required"><?= $lang['straggrstype'] ?></th>
+				<td class="data"><input name="stype" size="32" maxlength="<?= $pg->_maxNameLen ?>"
+						value="<?= html_esc($_REQUEST['stype']) ?>" /></td>
+			</tr>
+			<tr>
+				<th class="data left"><?= $lang['straggrffunc'] ?></th>
+				<td class="data"><input name="ffunc" size="32" maxlength="<?= $pg->_maxNameLen ?>"
+						value="<?= html_esc($_REQUEST['ffunc']) ?>" /></td>
+			</tr>
+			<tr>
+				<th class="data left"><?= $lang['straggrinitcond'] ?></th>
+				<td class="data"><input name="initcond" size="32" maxlength="<?= $pg->_maxNameLen ?>"
+						value="<?= html_esc($_REQUEST['initcond']) ?>" /></td>
+			</tr>
+			<tr>
+				<th class="data left"><?= $lang['straggrsortop'] ?></th>
+				<td class="data"><input name="sortop" size="32" maxlength="<?= $pg->_maxNameLen ?>"
+						value="<?= html_esc($_REQUEST['sortop']) ?>" /></td>
+			</tr>
+			<tr>
+				<th class="data left"><?= $lang['strcomment'] ?></th>
+				<td><textarea name="aggrcomment" rows="3" cols="32"><?= html_esc($_REQUEST['aggrcomment']) ?></textarea>
+				</td>
+			</tr>
+		</table>
+		<p>
+			<input type="hidden" name="action" value="save_create" />
+			<?= $misc->form ?>
+			<input type="submit" value="<?= $lang['strcreate'] ?>" />
+			<input type="submit" name="cancel" value="<?= $lang['strcancel'] ?>" />
+		</p>
+	</form>
+	<?php
 }
 
 /** 
@@ -119,8 +144,9 @@ function doCreate($msg = '')
  */
 function doSaveAlter()
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$lang = AppContainer::getLang();
+	$aggregateActions = new AggregateActions($pg);
 
 	// Check inputs
 	if (trim($_REQUEST['aggrname']) == '') {
@@ -128,7 +154,7 @@ function doSaveAlter()
 		return;
 	}
 
-	$status = $data->alterAggregate(
+	$status = $aggregateActions->alterAggregate(
 		$_REQUEST['aggrname'],
 		$_REQUEST['aggrtype'],
 		$_REQUEST['aggrowner'],
@@ -153,45 +179,59 @@ function doSaveAlter()
  */
 function doAlter($msg = '')
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$aggregateActions = new AggregateActions($pg);
 
 	$misc->printTrail('aggregate');
 	$misc->printTitle($lang['stralter'], 'pg.aggregate.alter');
 	$misc->printMsg($msg);
 
-	echo "<form action=\"aggregates.php\" method=\"post\">\n";
-	$aggrdata = $data->getAggregate($_REQUEST['aggrname'], $_REQUEST['aggrtype']);
-	if ($aggrdata->recordCount() > 0) {
-		// Output table header
-		echo "<table>\n";
-		echo "\t<tr>\n\t\t<th class=\"data required\">{$lang['strname']}</th>";
-		echo "<th class=\"data required\">{$lang['strowner']}</th>";
-		echo "<th class=\"data required\">{$lang['strschema']}</th>\n\t</tr>\n";
-
-		// Display aggregate's name, owner and schema
-		echo "\t<tr>\n\t\t<td><input name=\"newaggrname\" size=\"32\" maxlength=\"32\" value=\"", html_esc($_REQUEST['aggrname']), "\" /></td>";
-		echo "<td><input name=\"newaggrowner\" size=\"32\" maxlength=\"32\" value=\"", html_esc($aggrdata->fields['usename']), "\" /></td>";
-		echo "<td><input name=\"newaggrschema\" size=\"32\" maxlength=\"32\" value=\"", html_esc($_REQUEST['schema']), "\" /></td>\n\t</tr>\n";
-		echo "\t<tr>\n\t\t<th class=\"data left\">{$lang['strcomment']}</th>\n";
-		echo "\t\t<td><textarea name=\"newaggrcomment\" rows=\"3\" cols=\"32\">",
-		html_esc($aggrdata->fields['aggrcomment']), "</textarea></td>\n\t</tr>\n";
-		echo "</table>\n";
-		echo "<p><input type=\"hidden\" name=\"action\" value=\"save_alter\" />\n";
-		echo $misc->form;
-		echo "<input type=\"hidden\" name=\"aggrname\" value=\"", html_esc($_REQUEST['aggrname']), "\" />\n";
-		echo "<input type=\"hidden\" name=\"aggrtype\" value=\"", html_esc($_REQUEST['aggrtype']), "\" />\n";
-		echo "<input type=\"hidden\" name=\"aggrowner\" value=\"", html_esc($aggrdata->fields['usename']), "\" />\n";
-		echo "<input type=\"hidden\" name=\"aggrschema\" value=\"", html_esc($_REQUEST['schema']), "\" />\n";
-		echo "<input type=\"hidden\" name=\"aggrcomment\" value=\"", html_esc($aggrdata->fields['aggrcomment']), "\" />\n";
-		echo "<input type=\"submit\" name=\"alter\" value=\"{$lang['stralter']}\" />\n";
-		echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" /></p>\n";
-	} else {
-		echo "<p>{$lang['strnodata']}</p>\n";
-		echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strback']}\" /></p>\n";
-	}
-	echo "</form>\n";
+	$aggrdata = $aggregateActions->getAggregate(
+		$_REQUEST['aggrname'],
+		$_REQUEST['aggrtype']
+	);
+	?>
+	<form action="aggregates.php" method="post">
+		<?php if ($aggrdata->recordCount() > 0) { ?>
+			<table>
+				<tr>
+					<th class="data required"><?= $lang['strname'] ?></th>
+					<th class="data required"><?= $lang['strowner'] ?></th>
+					<th class="data required"><?= $lang['strschema'] ?></th>
+				</tr>
+				<tr>
+					<td><input name="newaggrname" size="32" maxlength="32" value="<?= html_esc($_REQUEST['aggrname']) ?>" />
+					</td>
+					<td><input name="newaggrowner" size="32" maxlength="32"
+							value="<?= html_esc($aggrdata->fields['usename']) ?>" /></td>
+					<td><input name="newaggrschema" size="32" maxlength="32" value="<?= html_esc($_REQUEST['schema']) ?>" />
+					</td>
+				</tr>
+				<tr>
+					<th class="data left"><?= $lang['strcomment'] ?></th>
+					<td><textarea name="newaggrcomment" rows="3"
+							cols="32"><?= html_esc($aggrdata->fields['aggrcomment']) ?></textarea></td>
+				</tr>
+			</table>
+			<p>
+				<input type="hidden" name="action" value="save_alter" />
+				<?= $misc->form ?>
+				<input type="hidden" name="aggrname" value="<?= html_esc($_REQUEST['aggrname']) ?>" />
+				<input type="hidden" name="aggrtype" value="<?= html_esc($_REQUEST['aggrtype']) ?>" />
+				<input type="hidden" name="aggrowner" value="<?= html_esc($aggrdata->fields['usename']) ?>" />
+				<input type="hidden" name="aggrschema" value="<?= html_esc($_REQUEST['schema']) ?>" />
+				<input type="hidden" name="aggrcomment" value="<?= html_esc($aggrdata->fields['aggrcomment']) ?>" />
+				<input type="submit" name="alter" value="<?= $lang['stralter'] ?>" />
+				<input type="submit" name="cancel" value="<?= $lang['strcancel'] ?>" />
+			</p>
+		<?php } else { ?>
+			<p class="nodata"><?= $lang['strnodata'] ?></p>
+			<p><input type="submit" name="cancel" value="<?= $lang['strback'] ?>" /></p>
+		<?php } ?>
+	</form>
+	<?php
 }
 
 /**
@@ -199,27 +239,35 @@ function doAlter($msg = '')
  */
 function doDrop($confirm)
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$aggregateActions = new AggregateActions($pg);
 
 	if ($confirm) {
 		$misc->printTrail('aggregate');
 		$misc->printTitle($lang['strdrop'], 'pg.aggregate.drop');
+		?>
+		<p><?= sprintf($lang['strconfdropaggregate'], html_esc($_REQUEST['aggrname'])) ?></p>
 
-		echo "<p>", sprintf($lang['strconfdropaggregate'], html_esc($_REQUEST['aggrname'])), "</p>\n";
-
-		echo "<form action=\"aggregates.php\" method=\"post\">\n";
-		echo "<p><input type=\"checkbox\" id=\"cascade\" name=\"cascade\" /> <label for=\"cascade\">{$lang['strcascade']}</label></p>\n";
-		echo "<p><input type=\"hidden\" name=\"action\" value=\"drop\" />\n";
-		echo "<input type=\"hidden\" name=\"aggrname\" value=\"", html_esc($_REQUEST['aggrname']), "\" />\n";
-		echo "<input type=\"hidden\" name=\"aggrtype\" value=\"", html_esc($_REQUEST['aggrtype']), "\" />\n";
-		echo $misc->form;
-		echo "<input type=\"submit\" name=\"drop\" value=\"{$lang['strdrop']}\" />\n";
-		echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" /></p>\n";
-		echo "</form>\n";
+		<form action="aggregates.php" method="post">
+			<p><input type="checkbox" id="cascade" name="cascade" /> <label for="cascade"><?= $lang['strcascade'] ?></label></p>
+			<p>
+				<input type="hidden" name="action" value="drop" />
+				<input type="hidden" name="aggrname" value="<?= html_esc($_REQUEST['aggrname']) ?>" />
+				<input type="hidden" name="aggrtype" value="<?= html_esc($_REQUEST['aggrtype']) ?>" />
+				<?= $misc->form ?>
+				<input type="submit" name="drop" value="<?= $lang['strdrop'] ?>" />
+				<input type="submit" name="cancel" value="<?= $lang['strcancel'] ?>" />
+			</p>
+		</form>
+		<?php
 	} else {
-		$status = $data->dropAggregate($_POST['aggrname'], $_POST['aggrtype'], isset($_POST['cascade']));
+		$status = $aggregateActions->dropAggregate(
+			$_POST['aggrname'],
+			$_POST['aggrtype'],
+			isset($_POST['cascade'])
+		);
 		if ($status == 0) {
 			AppContainer::setShouldReloadTree(true);
 			doDefault($lang['straggregatedropped']);
@@ -233,41 +281,67 @@ function doDrop($confirm)
  */
 function doProperties($msg = '')
 {
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$aggregateActions = new AggregateActions($pg);
+
+	$aggrdata = $aggregateActions->getAggregate(
+		$_REQUEST['aggrname'],
+		$_REQUEST['aggrtype']
+	);
 
 	$misc->printTrail('aggregate');
 	$misc->printTitle($lang['strproperties'], 'pg.aggregate');
 	$misc->printMsg($msg);
 
-	$aggrdata = $data->getAggregate($_REQUEST['aggrname'], $_REQUEST['aggrtype']);
-
 	if ($aggrdata->recordCount() > 0) {
-		// Display aggregate's info
-		echo "<table>\n";
-		echo "<tr>\n\t<th class=\"data left\">{$lang['strname']}</th>\n";
-		echo "\t<td class=\"data1\">", html_esc($_REQUEST['aggrname']), "</td>\n</tr>\n";
-		echo "<tr>\n\t<th class=\"data left\">{$lang['straggrbasetype']}</th>\n";
-		echo "\t<td class=\"data1\">", html_esc($_REQUEST['aggrtype']), "</td>\n</tr>\n";
-		echo "<tr>\n\t<th class=\"data left\">{$lang['straggrsfunc']}</th>\n";
-		echo "\t<td class=\"data1\">", html_esc($aggrdata->fields['aggtransfn']), "</td>\n</tr>\n";
-		echo "<tr>\n\t<th class=\"data left\">{$lang['straggrstype']}</th>\n";
-		echo "\t<td class=\"data1\">", html_esc($aggrdata->fields['aggstype']), "</td>\n</tr>\n";
-		echo "<tr>\n\t<th class=\"data left\">{$lang['straggrffunc']}</th>\n";
-		echo "\t<td class=\"data1\">", html_esc($aggrdata->fields['aggfinalfn']), "</td>\n</tr>\n";
-		echo "<tr>\n\t<th class=\"data left\">{$lang['straggrinitcond']}</th>\n";
-		echo "\t<td class=\"data1\">", html_esc($aggrdata->fields['agginitval']), "</td>\n</tr>\n";
-		if ($data->hasAggregateSortOp()) {
-			echo "<tr>\n\t<th class=\"data left\">{$lang['straggrsortop']}</th>\n";
-			echo "\t<td class=\"data1\">", html_esc($aggrdata->fields['aggsortop']), "</td>\n</tr>\n";
-		}
-		echo "<tr>\n\t<th class=\"data left\">{$lang['strowner']}</th>\n";
-		echo "\t<td class=\"data1\">", html_esc($aggrdata->fields['usename']), "</td>\n</tr>\n";
-		echo "<tr>\n\t<th class=\"data left\">{$lang['strcomment']}</th>\n";
-		echo "\t<td class=\"data1\">", $misc->printVal($aggrdata->fields['aggrcomment']), "</td>\n</tr>\n";
-		echo "</table>\n";
-	} else echo "<p>{$lang['strnodata']}</p>\n";
+		?>
+		<table>
+			<tr>
+				<th class="data left"><?= $lang['strname'] ?></th>
+				<td class="data1"><?= html_esc($_REQUEST['aggrname']) ?></td>
+			</tr>
+			<tr>
+				<th class="data left"><?= $lang['straggrbasetype'] ?></th>
+				<td class="data1"><?= html_esc($_REQUEST['aggrtype']) ?></td>
+			</tr>
+			<tr>
+				<th class="data left"><?= $lang['straggrsfunc'] ?></th>
+				<td class="data1"><?= html_esc($aggrdata->fields['aggtransfn']) ?></td>
+			</tr>
+			<tr>
+				<th class="data left"><?= $lang['straggrstype'] ?></th>
+				<td class="data1"><?= html_esc($aggrdata->fields['aggstype']) ?></td>
+			</tr>
+			<tr>
+				<th class="data left"><?= $lang['straggrffunc'] ?></th>
+				<td class="data1"><?= html_esc($aggrdata->fields['aggfinalfn']) ?></td>
+			</tr>
+			<tr>
+				<th class="data left"><?= $lang['straggrinitcond'] ?></th>
+				<td class="data1"><?= html_esc($aggrdata->fields['agginitval']) ?></td>
+			</tr>
+			<tr>
+				<th class="data left"><?= $lang['straggrsortop'] ?></th>
+				<td class="data1"><?= html_esc($aggrdata->fields['aggsortop']) ?></td>
+			</tr>
+			<tr>
+				<th class="data left"><?= $lang['strowner'] ?></th>
+				<td class="data1"><?= html_esc($aggrdata->fields['usename']) ?></td>
+			</tr>
+			<tr>
+				<th class="data left"><?= $lang['strcomment'] ?></th>
+				<td class="data1"><?= $misc->printVal($aggrdata->fields['aggrcomment']) ?></td>
+			</tr>
+		</table>
+		<?php
+	} else {
+		?>
+		<p class="nodata"><?= $lang['strnodata'] ?></p>
+		<?php
+	}
+
 
 	$navlinks = [
 		'showall' => [
@@ -281,12 +355,10 @@ function doProperties($msg = '')
 					]
 				]
 			],
+			'icon' => $misc->icon('Aggregates'),
 			'content' => $lang['straggrshowall']
-		]
-	];
-
-	if ($data->hasAlterAggregate()) {
-		$navlinks['alter'] = [
+		],
+		'alter' => [
 			'attr' => [
 				'href' => [
 					'url' => 'aggregates.php',
@@ -300,25 +372,26 @@ function doProperties($msg = '')
 					]
 				]
 			],
+			'icon' => $misc->icon('Edit'),
 			'content' => $lang['stralter']
-		];
-	}
-
-	$navlinks['drop'] = [
-		'attr' => [
-			'href' => [
-				'url' => 'aggregates.php',
-				'urlvars' => [
-					'action' => 'confirm_drop',
-					'server' => $_REQUEST['server'],
-					'database' => $_REQUEST['database'],
-					'schema' => $_REQUEST['schema'],
-					'aggrname' => $_REQUEST['aggrname'],
-					'aggrtype' => $_REQUEST['aggrtype']
-				]
-			]
 		],
-		'content' => $lang['strdrop']
+		'drop' => [
+			'attr' => [
+				'href' => [
+					'url' => 'aggregates.php',
+					'urlvars' => [
+						'action' => 'confirm_drop',
+						'server' => $_REQUEST['server'],
+						'database' => $_REQUEST['database'],
+						'schema' => $_REQUEST['schema'],
+						'aggrname' => $_REQUEST['aggrname'],
+						'aggrtype' => $_REQUEST['aggrtype']
+					]
+				]
+			],
+			'icon' => $misc->icon('Delete'),
+			'content' => $lang['strdrop']
+		],
 	];
 
 	$misc->printNavLinks($navlinks, 'aggregates-properties', get_defined_vars());
@@ -330,23 +403,25 @@ function doProperties($msg = '')
  */
 function doDefault($msg = '')
 {
-	$data = AppContainer::getData();
-	$conf = AppContainer::getConf();
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$aggregateActions = new AggregateActions($pg);
 
 	$misc->printTrail('schema');
 	$misc->printTabs('schema', 'aggregates');
 	$misc->printMsg($msg);
 
-	$aggregates = $data->getAggregates();
+	$aggregates = $aggregateActions->getAggregates();
 
 	$columns = [
 		'aggrname' => [
 			'title' => $lang['strname'],
 			'field' => field('proname'),
-			'url'   => "redirect.php?subject=aggregate&amp;action=properties&amp;{$misc->href}&amp;",
-			'vars'  => ['aggrname' => 'proname', 'aggrtype' => 'proargtypes'],
+			'url' => "redirect.php?subject=aggregate&amp;action=properties&amp;{$misc->href}&amp;",
+			'vars' => ['aggrname' => 'proname', 'aggrtype' => 'proargtypes'],
+			'icon' => 'Aggregate',
+			'class' => 'nowrap'
 		],
 		'aggrtype' => [
 			'title' => $lang['strtype'],
@@ -400,7 +475,6 @@ function doDefault($msg = '')
 		]
 	];
 
-	if (!$data->hasAlterAggregate()) unset($actions['alter']);
 	$misc->printTable($aggregates, $columns, $actions, 'aggregates-aggregates', $lang['strnoaggregates']);
 
 	$navlinks = [
@@ -416,6 +490,7 @@ function doDefault($msg = '')
 					]
 				]
 			],
+			'icon' => $misc->icon('CreateAggregate'),
 			'content' => $lang['strcreateaggregate']
 		]
 	];
@@ -428,18 +503,19 @@ function doDefault($msg = '')
 function doTree()
 {
 	$misc = AppContainer::getMisc();
-	$data = AppContainer::getData();
+	$pg = AppContainer::getPostgres();
+	$aggregateActions = new AggregateActions($pg);
 
-	$aggregates = $data->getAggregates();
+	$aggregates = $aggregateActions->getAggregates();
 
 	$proto = concat(field('proname'), ' (', field('proargtypes'), ')');
 	$reqvars = $misc->getRequestVars('aggregate');
 
 	$attrs = [
-		'text'    => $proto,
-		'icon'    => 'Aggregate',
+		'text' => $proto,
+		'icon' => 'Aggregate',
 		'toolTip' => field('aggcomment'),
-		'action'  => url(
+		'action' => url(
 			'redirect.php',
 			$reqvars,
 			[
@@ -454,7 +530,16 @@ function doTree()
 	exit;
 }
 
-if ($action == 'tree') doTree();
+// Main program
+
+$misc = AppContainer::getMisc();
+$lang = AppContainer::getLang();
+
+$action = $_REQUEST['action'] ?? '';
+
+
+if ($action == 'tree')
+	doTree();
 
 $misc->printHeader($lang['straggregates']);
 $misc->printBody();
@@ -464,19 +549,25 @@ switch ($action) {
 		doCreate();
 		break;
 	case 'save_create':
-		if (isset($_POST['cancel'])) doDefault();
-		else doSaveCreate();
+		if (isset($_POST['cancel']))
+			doDefault();
+		else
+			doSaveCreate();
 		break;
 	case 'alter':
 		doAlter();
 		break;
 	case 'save_alter':
-		if (isset($_POST['alter'])) doSaveAlter();
-		else doProperties();
+		if (isset($_POST['alter']))
+			doSaveAlter();
+		else
+			doProperties();
 		break;
 	case 'drop':
-		if (isset($_POST['drop'])) doDrop(false);
-		else doDefault();
+		if (isset($_POST['drop']))
+			doDrop(false);
+		else
+			doDefault();
 		break;
 	case 'confirm_drop':
 		doDrop(true);

@@ -903,7 +903,7 @@ function doDefault($msg = '')
 			]
 		],
 		'insert' => [
-			'icon' => $misc->icon('Operator'),
+			'icon' => $misc->icon('Add'),
 			'content' => $lang['strinsert'],
 			'attr' => [
 				'href' => [
@@ -1019,11 +1019,12 @@ function doDefault($msg = '')
 					]
 				]
 			],
+			'icon' => $misc->icon('CreateTable'),
 			'content' => $lang['strcreatetable']
 		]
 	];
 
-	if (($tables->recordCount() > 0) && $pg->hasCreateTableLike()) {
+	if ($tables->recordCount() > 0) {
 		$navlinks['createlike'] = [
 			'attr' => [
 				'href' => [
@@ -1036,6 +1037,7 @@ function doDefault($msg = '')
 					]
 				]
 			],
+			'icon' => $misc->icon('CreateTableLike'),
 			'content' => $lang['strcreatetablelike']
 		];
 	}
