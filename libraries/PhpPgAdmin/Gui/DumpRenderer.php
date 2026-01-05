@@ -151,18 +151,16 @@ class DumpRenderer
                     <input type="checkbox" id="include_comments" name="include_comments" value="true" checked="checked" />
                     <label for="include_comments"><?= $this->lang['strincludeobjectcomments']; ?></label>
                 </div>
-                <?php if ($subject === 'database'): ?>
+                <?php if ($subject === 'server' || $subject === 'database'): ?>
                     <div>
-                        <input type="checkbox" id="suppress_create_database" name="suppress_create_database" value="true" />
-                        <label
-                            for="suppress_create_database"><?= $this->lang['strsuppressdbcreation'] ?? 'Suppress database creation'; ?></label>
+                        <input type="checkbox" id="add_create_database" name="add_create_database" value="true" />
+                        <label for="add_create_database"><?= $this->lang['stradddbcreation'] ?? 'Add database creation'; ?></label>
                     </div>
                 <?php endif; ?>
-                <?php if ($subject === 'schema'): ?>
+                <?php if ($subject === 'schema' || $subject === 'database'): ?>
                     <div>
-                        <input type="checkbox" id="suppress_create_schema" name="suppress_create_schema" value="true" />
-                        <label
-                            for="suppress_create_schema"><?= $this->lang['strsuppressschemacreation'] ?? 'Suppress schema creation'; ?></label>
+                        <input type="checkbox" id="add_create_schema" name="add_create_schema" value="true" />
+                        <label for="add_create_schema"><?= $this->lang['straddschemacreation'] ?? 'Add schema creation'; ?></label>
                     </div>
                 <?php endif; ?>
             </fieldset>
@@ -242,9 +240,10 @@ class DumpRenderer
                 <?php if ($compressionCaps['gzip'] ?? false): ?>
                     <div>
                         <input type="radio" id="output_download_gzip" name="output" value="download-gzip" />
-                        <label for="output_download_gzip"><?= $this->lang['strdownloadasgzipped'] ?? 'Download as Gzip'; ?></label>
+                        <label for="output_download_gzip"><?= $this->lang['strdownloadgzipped'] ?></label>
                     </div>
                 <?php endif ?>
+                <!--
                 <?php if ($compressionCaps['bzip2'] ?? false): ?>
                     <div>
                         <input type="radio" id="output_download_bzip2" name="output" value="download-bzip2" />
@@ -257,6 +256,7 @@ class DumpRenderer
                         <label for="output_download_zip"><?= $this->lang['strdownloadaszip'] ?? 'Download as ZIP'; ?></label>
                     </div>
                 <?php endif ?>
+                -->
             </fieldset>
 
             <p>
@@ -292,8 +292,8 @@ class DumpRenderer
 
                 // Only setup if form elements exist on this page
                 if (whatRadios.length > 0 && structureOptions) {
-                    const suppressSchema = document.getElementById('suppress_create_schema');
-                    const suppressDb = document.getElementById('suppress_create_database');
+                    const addCreateSchema = document.getElementById('add_create_schema');
+                    const addCreateDb = document.getElementById('add_create_database');
                     function updateOptions() {
                         const selectedWhat = form.querySelector('input[name="what"]:checked').value;
                         const dumperValue = form.querySelector('input[name="dumper"]:checked').value;
@@ -404,17 +404,17 @@ class DumpRenderer
                             }
                         }
 
-                        // Disable suppression options when using pg_dump/pg_dumpall (handled by pg_dump)
-                        if (suppressSchema) {
-                            suppressSchema.disabled = pgdumpSelected || pgdumpallSelected;
-                            if (suppressSchema.disabled) {
-                                suppressSchema.checked = false;
+                        // Disable add-create options when using pg_dump/pg_dumpall (pg_dump controls creation)
+                        if (addCreateSchema) {
+                            addCreateSchema.disabled = pgdumpSelected || pgdumpallSelected;
+                            if (addCreateSchema.disabled) {
+                                addCreateSchema.checked = false;
                             }
                         }
-                        if (suppressDb) {
-                            suppressDb.disabled = pgdumpSelected || pgdumpallSelected;
-                            if (suppressDb.disabled) {
-                                suppressDb.checked = false;
+                        if (addCreateDb) {
+                            addCreateDb.disabled = pgdumpSelected || pgdumpallSelected;
+                            if (addCreateDb.disabled) {
+                                addCreateDb.checked = false;
                             }
                         }
 

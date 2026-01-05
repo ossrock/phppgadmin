@@ -101,9 +101,10 @@ class QueryExportRenderer
                 <?php if ($compressionCaps['gzip'] ?? false): ?>
                     <div>
                         <input type="radio" id="output_download_gzip" name="output" value="download-gzip" />
-                        <label for="output_download_gzip"><?= $this->lang['strdownloadasgzipped'] ?? 'Download as Gzip'; ?></label>
+                        <label for="output_download_gzip"><?= $this->lang['strdownloadgzipped'] ?></label>
                     </div>
                 <?php endif ?>
+                <!--
                 <?php if ($compressionCaps['bzip2'] ?? false): ?>
                     <div>
                         <input type="radio" id="output_download_bzip2" name="output" value="download-bzip2" />
@@ -116,6 +117,7 @@ class QueryExportRenderer
                         <label for="output_download_zip"><?= $this->lang['strdownloadaszip'] ?? 'Download as ZIP'; ?></label>
                     </div>
                 <?php endif ?>
+                -->
             </fieldset>
 
             <p>

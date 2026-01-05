@@ -78,8 +78,8 @@ if ($use_internal) {
 		'databases' => isset($_REQUEST['databases']) ? (array) $_REQUEST['databases'] : [],
 		'insert_format' => $insert_format,
 		'truncate_tables' => isset($_REQUEST['truncate_tables']),
-		'suppress_create_schema' => isset($_REQUEST['suppress_create_schema']),
-		'suppress_create_database' => isset($_REQUEST['suppress_create_database']),
+		'add_create_database' => isset($_REQUEST['add_create_database']),
+		'add_create_schema' => isset($_REQUEST['add_create_schema']),
 	];
 
 	// Set response headers and open output stream

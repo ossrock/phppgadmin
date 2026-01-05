@@ -309,6 +309,7 @@
 		editor.setHighlightActiveLine(false);
 		editor.renderer.$cursorLayer.element.style.display = "none";
 		editor.setValue(element.value || "", -1);
+		editor.setReadOnly(element.hasAttribute("readonly"));
 
 		editor.session.on("change", function () {
 			hidden.value = editor.getValue();

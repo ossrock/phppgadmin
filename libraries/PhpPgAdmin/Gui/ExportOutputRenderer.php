@@ -32,10 +32,10 @@ class ExportOutputRenderer
         <div class="mb-2">
             <input type="button" value="🔙 Back" onclick="history.back()">
             <input type="button" value="🔄 Reload" onclick="location.reload()">
-            <input type="button" value="✨ Format" onclick="createSqlEditor(document.getElementById('export-output'))">
+            <input type="button" value="✨ Highlight" onclick="createSqlEditor(document.getElementById('export-output'))">
         </div>
         <?php
-        echo "<textarea id=\"export-output\" class=\"export-output\" readonly>";
+        echo "<textarea id=\"export-output\" class=\"export-output\">";
         if ($exe_path && $version) {
             echo "-- Dumping with " . htmlspecialchars($exe_path) . " version " . $version . "\n\n";
         }
@@ -52,7 +52,7 @@ class ExportOutputRenderer
         <div class="my-2">
             <input type="button" value="🔙 Back" onclick="history.back()">
             <input type="button" value="🔄 Reload" onclick="location.reload()">
-            <input type="button" value="✨ Format" onclick="createSqlEditor(document.getElementById('export-output'))">
+            <input type="button" value="✨ Highlight" onclick="createSqlEditor(document.getElementById('export-output'))">
         </div>
         <?php
         $misc = AppContainer::getMisc();

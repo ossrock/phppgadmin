@@ -38,8 +38,8 @@ class SchemaDumper extends AbstractDumper
         // Write standard dump header for schema exports
         $this->writeHeader("Schema: " . addslashes($c_schema));
 
-        // Schema creation and header may be suppressed for limited-privilege users
-        if (empty($options['suppress_create_schema'])) {
+        // Optional schema creation for super users
+        if (!empty($options['add_create_schema'])) {
             $this->writeDrop('SCHEMA', $c_schema, $options);
             $this->write("CREATE SCHEMA " . $this->getIfNotExists($options) . "\"" . addslashes($c_schema) . "\";\n");
         }

@@ -33,8 +33,8 @@ class DatabaseDumper extends AbstractDumper
         }
 
         // Database settings
-        // Optionally suppress creation and/or connect markers when orchestrated by ServerDumper
-        if (empty($options['suppress_create_database'])) {
+        // Optionally add creation and/or connect markers when orchestrated by ServerDumper
+        if (!empty($options['add_create_database'])) {
             $this->write("-- Database settings\n");
             if (!empty($options['clean'])) {
                 $this->write("DROP DATABASE IF EXISTS \"" . addslashes($c_database) . "\" CASCADE;\n");
