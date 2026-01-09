@@ -51,16 +51,23 @@ function handle_process_chunk_stream(): void
             return;
         }
 
+        // Parameters
+        $baseOffset = isset($_REQUEST['offset']) ? (int) $_REQUEST['offset'] : 0;
+        $remainderLen = isset($_REQUEST['remainder_len']) ? max(0, (int) $_REQUEST['remainder_len']) : 0;
+        $skipCount = isset($_REQUEST['skip']) ? max(0, (int) $_REQUEST['skip']) : 0;
+        $eof = !empty($_REQUEST['eof']);
+
         // Initialize namespaced session storage for stream imports.
         if (!isset($_SESSION['stream_import'])) {
             $_SESSION['stream_import'] = [];
         }
 
-        if (!isset($_SESSION['stream_import'][$importSessionId])) {
+        if (!isset($_SESSION['stream_import'][$importSessionId]) || $baseOffset === 0) {
             $_SESSION['stream_import'][$importSessionId] = [
                 'copy_active' => false,
                 'copy_header' => '',
                 'truncated_tables' => [],
+                'deferred' => [],
                 'home_database' => '',
                 'home_schema' => '',
                 'current_database' => '',
@@ -80,12 +87,6 @@ function handle_process_chunk_stream(): void
             echo json_encode(['error' => 'Not authenticated']);
             return;
         }
-
-        // Parameters
-        $baseOffset = isset($_REQUEST['offset']) ? (int) $_REQUEST['offset'] : 0;
-        $remainderLen = isset($_REQUEST['remainder_len']) ? max(0, (int) $_REQUEST['remainder_len']) : 0;
-        $skipCount = isset($_REQUEST['skip']) ? max(0, (int) $_REQUEST['skip']) : 0;
-        $eof = !empty($_REQUEST['eof']);
 
         $logCollector = new LogCollector(true);
 
@@ -114,6 +115,21 @@ function handle_process_chunk_stream(): void
             return;
         }
 
+        // Calculate checksum of received data if client provided one
+        $clientHash = $_REQUEST['chunk_hash'] ?? null;
+        if ($clientHash !== null) {
+            $serverHash = hash('fnv1a64', $raw);
+            if ($serverHash !== $clientHash) {
+                http_response_code(400);
+                echo json_encode([
+                    'error' => 'Checksum mismatch: chunk corrupted during transmission',
+                    'expected' => $clientHash,
+                    'received' => $serverHash,
+                ]);
+                return;
+            }
+        }
+
         // Detect gzip magic bytes 0x1F 0x8B
         $decoded = $raw;
         if (strlen($raw) >= 2) {
@@ -132,6 +148,7 @@ function handle_process_chunk_stream(): void
         // Reset per-import state on first chunk
         if ($baseOffset === 0 && $remainderLen === 0) {
             $streamState['truncated_tables'] = [];
+            $streamState['deferred'] = [];
             $streamState['cached_settings'] = [];
             $streamState['last_applied_db'] = null;
             if ($streamState['home_database'] === '') {
@@ -247,7 +264,7 @@ function handle_process_chunk_stream(): void
                 'scope_ident' => $scopeIdent,
                 'ownership_queue' => [],
                 'rights_queue' => [],
-                'deferred' => [],
+                'deferred' => &$streamState['deferred'],
                 'truncated_tables' => &$streamState['truncated_tables'],
             ];
             $GLOBALS['phppgadmin_import_quiet'] = true;
@@ -266,6 +283,55 @@ function handle_process_chunk_stream(): void
                 $logCollector,
                 $errors
             );
+            unset($GLOBALS['phppgadmin_import_quiet']);
+        };
+
+        $executeDeferred = function () use (&$pg, &$streamState, $options, &$errors, $logCollector) {
+            if (empty($streamState['deferred'])) {
+                return;
+            }
+
+            $stmts = $streamState['deferred'];
+            $streamState['deferred'] = [];
+
+            $scope = $_REQUEST['scope'] ?? 'database';
+            $scopeIdent = $_REQUEST['scope_ident'] ?? '';
+            $optsToPass = $options;
+            $optsToPass['error_mode'] = ($options['stop_on_error'] ? 'abort' : 'log');
+            // Force execution of self-affecting statements now.
+            $optsToPass['defer_self'] = false;
+
+            $execState = [
+                'scope' => $scope,
+                'scope_ident' => $scopeIdent,
+                'ownership_queue' => [],
+                'rights_queue' => [],
+                'deferred' => [],
+                'truncated_tables' => &$streamState['truncated_tables'],
+            ];
+
+            $GLOBALS['phppgadmin_import_quiet'] = true;
+            try {
+                $roleActions = new RoleActions($pg);
+                $isSuper = $roleActions->isSuperUser();
+                ImportExecutor::executeStatementsBatch(
+                    $stmts,
+                    $optsToPass,
+                    $execState,
+                    $pg,
+                    $scope,
+                    $isSuper,
+                    function () {
+                        return true;
+                    },
+                    $logCollector,
+                    $errors
+                );
+                $logCollector->addInfo('Deferred statements executed: ' . count($stmts));
+            } catch (\Throwable $e) {
+                $errors++;
+                $logCollector->addError('Deferred execution failed: ' . $e->getMessage());
+            }
             unset($GLOBALS['phppgadmin_import_quiet']);
         };
 
@@ -391,6 +457,8 @@ function handle_process_chunk_stream(): void
         }
 
         if ($desiredDb !== '' && $streamState['active_database'] !== $desiredDb) {
+            // Execute deferred self-affecting statements before leaving the current database.
+            $executeDeferred();
             try {
                 $pgTarget = $misc->getDatabaseAccessor($desiredDb);
                 if ($pgTarget !== null) {
@@ -452,6 +520,11 @@ function handle_process_chunk_stream(): void
             }
         }
 
+        // On EOF, flush any remaining deferred statements for the last database.
+        if ($eof && !$inCopy) {
+            $executeDeferred();
+        }
+
         // Return the *actual* remainder string.
         // The remainder is not guaranteed to be a literal suffix of the uploaded payload
         // (SqlParser may normalize/trim while streaming INSERT ... VALUES), so returning only
@@ -476,6 +549,7 @@ $action = $_REQUEST['action'] ?? 'process_chunk';
 
 switch ($action) {
     case 'process_chunk':
+        //usleep(1000000); // 0.1s
         handle_process_chunk_stream();
         break;
     default:

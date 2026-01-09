@@ -1,6 +1,6 @@
 // Streaming uploader using new process_chunk endpoint
-// Sends uncompressed chunks and prepends server-provided remainder.
-// Minimal v1: no IndexedDB persistence yet.
+// Sends chunks and prepends server-provided remainder.
+// Supports compressed file decompression and optional chunk compression.
 
 import {
 	el,
@@ -10,6 +10,7 @@ import {
 	fnv1a64,
 } from "./utils.js";
 import { appendServerToUrl } from "./api.js";
+import { createUniversalDecompressStream, gzipSync } from "./decompressor.js";
 
 function utf8Encode(str) {
 	return new TextEncoder().encode(str);
@@ -32,33 +33,32 @@ async function startStreamUpload() {
 		alert("No file selected");
 		return;
 	}
-	const file = fileInput.files[0];
+	let file = fileInput.files[0];
 	const hash = fnv1a64(
 		utf8Encode(file.name + "|" + file.size + "|" + file.lastModified)
 	);
 
 	// Stable per-import session key so multiple uploads can run in parallel.
 	const importSessionId = `import-${hash}`;
-	//const importSessionId = `import-${Math.random().toString(16).slice(2)}`;
 	console.log("Import session id:", importSessionId);
 
-	// Basic caps & type checks
-	const caps = getServerCaps(fileInput);
+	// Detect compression format
 	const magic = await sniffMagicType(file);
-	if (magic === "gzip" || magic === "bzip2" || magic === "zip") {
-		alert(
-			"Compressed imports not yet supported in streaming mode. Please decompress locally and retry."
-		);
-		return;
-	}
+	const isCompressed =
+		magic === "gzip" || magic === "bzip2" || magic === "zip";
+	console.log(
+		`File format: ${magic}${isCompressed ? " (will decompress)" : ""}`
+	);
+
+	// Check if chunk compression is enabled
+	const compressChunks = !!document.querySelector(
+		"input[name='opt_compress_chunks']"
+	)?.checked;
 
 	const scope = el("import_scope")?.value || "database";
 	const scopeIdent = el("import_scope_ident")?.value || "";
 
 	// Options
-	const stopOnError = !!document.querySelector(
-		"input[name='opt_stop_on_error']"
-	)?.checked;
 	const importForm = el("importForm");
 	const optNames = [
 		"opt_roles",
@@ -77,20 +77,41 @@ async function startStreamUpload() {
 		const ck = importForm[n];
 		if (ck && ck.checked) opts[n] = 1;
 	}
-	console.log("Import options:", opts);
+
+	// Error handling mode
+	const errorModeInput = document.querySelector(
+		"input[name='opt_error_mode']:checked"
+	);
+	const errorMode = errorModeInput ? errorModeInput.value : "abort";
+	if (errorMode === "abort") {
+		opts.opt_stop_on_error = 1;
+	}
+
+	console.log("Import options:", opts, `Compress chunks: ${compressChunks}`);
 
 	// UI elements
 	const importUI = el("importUI");
-	const uploadPhase = el("uploadPhase");
-	const importPhase = el("importPhase");
 	const importProgress = el("importProgress");
 	const importStatus = el("importStatus");
 	const importLog = el("importLog");
+	const importStopBtn = el("importStopBtn");
 
 	if (importUI) importUI.style.display = "block";
-	if (uploadPhase) uploadPhase.style.display = "none";
-	if (importPhase) importPhase.style.display = "block";
 	if (importLog) importLog.textContent = "";
+
+	let stopRequested = false;
+
+	// Wire up stop button
+	if (importStopBtn) {
+		importStopBtn.style.display = "inline-block";
+		importStopBtn.onclick = () => {
+			stopRequested = true;
+			importStopBtn.disabled = true;
+			if (importStatus) {
+				importStatus.textContent += " — Stopping...";
+			}
+		};
+	}
 
 	// Chunk size from config attrs
 	const chunkAttr = fileInput.dataset
@@ -99,39 +120,76 @@ async function startStreamUpload() {
 	const chunkSize = (chunkAttr && parseInt(chunkAttr, 10)) || 5 * 1024 * 1024;
 
 	let offset = 0;
+	let bytesRead = 0; // track compressed input bytes for progress
 	let remainder = ""; // server-provided incomplete tail
 	const skipInput = document.querySelector("input[name='skip_statements']");
 	let stuckCount = 0;
 
-	async function step() {
-		const prevOffset = offset;
-		const prevRemainderLen = remainder ? utf8Encode(remainder).length : 0;
-		const end = Math.min(offset + chunkSize, file.size);
-		const blob = file.slice(offset, end);
-		const bytes = new Uint8Array(await blob.arrayBuffer());
+	let decompressor = createUniversalDecompressStream();
+	let decompressionError = null;
+	let decompressionFinished = false;
 
-		const remBytes = remainder ? utf8Encode(remainder) : new Uint8Array(0);
-		const payload = remBytes.length ? concatBytes(remBytes, bytes) : bytes;
+	// Buffering queue for decompressed bytes (list of Uint8Array)
+	const chunkQueue = [];
+	let queueLen = 0;
 
-		// Build URL
+	// Push decompressed data into queue
+	decompressor.ondata = (chunk, final) => {
+		chunkQueue.push(chunk);
+		queueLen += chunk.length;
+		if (final) decompressionFinished = true;
+	};
+	decompressor.onerror = (err) => {
+		decompressionError = err;
+		decompressionFinished = true;
+	};
+
+	// Helper: consume N bytes from chunkQueue and return single Uint8Array
+	function readFromQueue(n) {
+		if (n === 0) return new Uint8Array(0);
+		let out = new Uint8Array(n);
+		let pos = 0;
+		while (pos < n && chunkQueue.length > 0) {
+			const head = chunkQueue[0];
+			const take = Math.min(n - pos, head.length);
+			out.set(head.subarray(0, take), pos);
+			pos += take;
+			if (take === head.length) {
+				chunkQueue.shift();
+			} else {
+				chunkQueue[0] = head.subarray(take);
+			}
+		}
+		queueLen -= pos;
+		return out.subarray(0, pos);
+	}
+
+	// Backpressure thresholds
+	const highWaterMark = chunkSize * 10;
+
+	// send single payload to server (prepends remainder and handles compression/hash)
+	async function sendPayload(payload, isFinal = false) {
+		let payloadToSend = payload;
+		let chunkCompressed = false;
+		if (compressChunks && payload.length > 0) {
+			payloadToSend = gzipSync(payload);
+			chunkCompressed = true;
+		}
+		const chunkHash = fnv1a64(payloadToSend);
+
 		const params = new URLSearchParams();
 		params.set("offset", String(offset));
-		params.set("remainder_len", String(remBytes.length));
-		if (end >= file.size) params.set("eof", "1");
-		params.set("scope", scope);
+		params.set(
+			"remainder_len",
+			String(remainder ? utf8Encode(remainder).length : 0)
+		);
+		if (chunkCompressed) params.set("chunk_compressed", "1");
+		if (isFinal) params.set("eof", "1");
 		params.set("import_session_id", importSessionId);
-		// include current database so server reconnects to the right DB
-		const dbEl = el("import_database");
-		const dbFromUI =
-			(dbEl && dbEl.value) ||
-			document.getElementById("importUI")?.dataset?.database ||
-			"";
-		if (dbFromUI) params.set("database", dbFromUI);
-		if (scopeIdent) params.set("scope_ident", scopeIdent);
-		if (stopOnError) params.set("opt_stop_on_error", "1");
-		const skipCount = parseInt(skipInput?.value || "0", 10) || 0;
-		if (skipCount > 0) params.set("skip", String(skipCount));
+		params.set("chunk_hash", chunkHash);
 		for (const [k, v] of Object.entries(opts)) params.set(k, String(v));
+		if (scope) params.set("scope", scope);
+		if (scopeIdent) params.set("scope_ident", scopeIdent);
 
 		const url = appendServerToUrl(
 			"dbimport.php?action=process_chunk&" + params.toString()
@@ -139,54 +197,38 @@ async function startStreamUpload() {
 
 		const resp = await fetch(url, {
 			method: "POST",
-			body: payload,
+			body: payloadToSend,
 			headers: { "Content-Type": "application/octet-stream" },
 		});
 		if (!resp.ok) {
 			const text = await resp.text();
-			throw new Error("Server error: " + text);
+			throw new Error(`Server error (${resp.status}): ${text}`);
 		}
 		const res = await resp.json();
 
-		// Update state
-		// Prefer server-provided remainder string (required when server transforms/normalizes remainder during streaming, and for future compressed streaming).
-		let remainderLenServer =
-			typeof res.remainder_len === "number" ? res.remainder_len : 0;
+		if (res.error && res.error.includes("checksum")) {
+			throw new Error(`Checksum mismatch: ${res.error}`);
+		}
+
+		// Update remainder/offset from server
 		if (typeof res.remainder === "string") {
 			remainder = res.remainder;
-			remainderLenServer = utf8Encode(remainder).length;
 		} else {
 			remainder = "";
 		}
-		offset = typeof res.offset === "number" ? res.offset : offset;
-
-		// Detect stall: no forward progress on either file offset OR remainder reduction.
-		// (At EOF, the only progress possible is that the remainder shrinks.)
-		if (offset === prevOffset && remainderLenServer === prevRemainderLen) {
-			stuckCount++;
+		if (typeof res.offset === "number") {
+			offset = res.offset;
 		} else {
-			stuckCount = 0;
+			offset += payload.length; // fallback
 		}
 
-		// UI progress
-		if (importProgress) {
-			const pct = Math.floor((offset / file.size) * 100);
-			importProgress.value = pct;
-		}
-		if (importStatus) {
-			importStatus.textContent = `Processed ${formatBytes(
-				offset
-			)} / ${formatBytes(file.size)}`;
-		}
-		// Log
+		// forward logs to UI
 		if (Array.isArray(res.logEntries) && importLog) {
 			for (const e of res.logEntries) {
 				const msg = e.message || e.statement || "";
 				if (msg && typeof msg === "string") {
-					// normalize timestamp: server now sends milliseconds since epoch
 					let timeMs;
 					if (typeof e.time === "number") {
-						// if the value looks like seconds (<= 1e11), convert to ms
 						timeMs = e.time > 1e11 ? e.time : e.time * 1000;
 					} else {
 						timeMs = Date.now();
@@ -199,55 +241,109 @@ async function startStreamUpload() {
 			}
 			importLog.scrollTop = importLog.scrollHeight;
 		}
-
-		// Continue if not done
-		// Stop if completed or if we appear stuck for multiple iterations
-		const done = offset >= file.size && remainderLenServer === 0;
-		if (done) return false;
-
-		// If we've reached EOF and have nothing new to send, but the server can't reduce the remainder,
-		// this is an unterminated/unsupported tail (not a recoverable stall).
-		if (
-			offset >= file.size &&
-			bytes.length === 0 &&
-			remainderLenServer > 0 &&
-			remainderLenServer === prevRemainderLen
-		) {
-			throw new Error(
-				`Reached end of file but ${remainderLenServer} bytes of SQL remain unprocessed. ` +
-					"The dump may be missing a terminating ';' or contains an unsupported trailing construct."
-			);
-		}
-
-		if (stuckCount >= 3) {
-			throw new Error(
-				"Import appears stalled (no progress). The file may contain a very large statement without a terminator or an unsupported COPY block."
-			);
-		}
-		return true;
 	}
 
+	// Process queue: accumulate until chunkSize and send sequentially
+	async function processQueue() {
+		while (true) {
+			// Wait for data unless decompression finished
+			while (queueLen < 1 && !decompressionFinished) {
+				await new Promise((r) => setTimeout(r, 20));
+			}
+
+			// Nothing left to send
+			if (decompressionFinished && queueLen === 0) {
+				return;
+			}
+
+			// Send either a full chunk or the final partial tail
+			while (
+				queueLen >= chunkSize ||
+				(decompressionFinished && queueLen > 0)
+			) {
+				const toTake = queueLen >= chunkSize ? chunkSize : queueLen;
+				const isFinalSend =
+					decompressionFinished && queueLen <= chunkSize;
+				const chunk = readFromQueue(toTake);
+				const remBytes = remainder
+					? utf8Encode(remainder)
+					: new Uint8Array(0);
+				let payload = chunk;
+				if (remBytes.length) {
+					payload = new Uint8Array(remBytes.length + chunk.length);
+					payload.set(remBytes, 0);
+					payload.set(chunk, remBytes.length);
+				}
+				await sendPayload(payload, isFinalSend);
+				if (importProgress)
+					importProgress.value = Math.min(
+						100,
+						Math.floor((bytesRead / file.size) * 100)
+					);
+				if (importStatus)
+					importStatus.textContent = `Processed ${formatBytes(
+						bytesRead
+					)} / ${formatBytes(file.size)}`;
+			}
+
+			// Backpressure to avoid runaway queue growth during long decompression
+			if (!decompressionFinished && queueLen > highWaterMark) {
+				while (queueLen > chunkSize) {
+					await new Promise((r) => setTimeout(r, 50));
+				}
+			}
+
+			// Small wait to yield if we have a partial chunk but not done decompressing
+			if (
+				!decompressionFinished &&
+				queueLen > 0 &&
+				queueLen < chunkSize
+			) {
+				await new Promise((r) => setTimeout(r, 20));
+			}
+		}
+	}
+
+	// Start reader + processing
+	const reader = file.stream().getReader();
+	let readerErr = null;
+	const queueProcessor = processQueue();
 	try {
 		while (true) {
-			const cont = await step();
-			if (!cont) break;
-			// small pacing to keep UI responsive
-			await new Promise((r) => setTimeout(r, 100));
+			const { value, done } = await reader.read();
+			if (stopRequested) {
+				reader.cancel();
+				return;
+			}
+			if (value) bytesRead += value.length;
+			await decompressor.push(value || new Uint8Array(), done);
+			while (queueLen > highWaterMark) {
+				await new Promise((r) => setTimeout(r, 50));
+			}
+			if (done) break;
 		}
-		if (importStatus) importStatus.textContent += " — Completed";
 	} catch (err) {
-		console.error(err);
-		alert("Import failed: " + (err?.message || err));
+		readerErr = err;
+		decompressionError = err;
+	} finally {
+		await queueProcessor;
+		if (readerErr) throw readerErr;
+		if (decompressionError)
+			throw new Error(
+				`Decompression failed: ${decompressionError.message}`
+			);
 	}
+
+	// Streaming upload completed — do not run legacy chunked upload logic below.
+	return;
 }
 
-function wireButton() {
+document.addEventListener("frameLoaded", () => {
+	// Wire up start button
 	const btn = el("importStart");
 	if (!btn) return;
 	btn.addEventListener("click", (ev) => {
 		ev.preventDefault();
 		startStreamUpload();
 	});
-}
-
-document.addEventListener("frameLoaded", wireButton);
+});

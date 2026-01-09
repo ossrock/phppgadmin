@@ -78,6 +78,8 @@ class ImportFormRenderer extends AbstractContext
                 <div><label><input type="checkbox" name="opt_defer_self" checked /> <?= $lang['strdeferself'] ?></label></div>
                 <div><label><input type="checkbox" name="opt_allow_drops" />
                         <?= $lang['strimportallowdrops'] ?? 'Allow DROP statements' ?></label></div>
+                <div style="margin-top:8px"><label><input type="checkbox" name="opt_compress_chunks" />
+                        <?= $lang['strimportcompresschunks'] ?? 'Compress chunks with gzip (saves bandwidth)' ?></label></div>
             </fieldset>
 
             <fieldset>
@@ -100,27 +102,19 @@ class ImportFormRenderer extends AbstractContext
         </form>
 
         <div id="importUI" style="display:none;margin-top:16px">
-            <div id="uploadPhase">
-                <h4><?= $lang['strupload'] ?>         <?= $lang['strprogress'] ?? 'Progress' ?></h4>
-                <progress id="uploadProgress" value="0" max="100" style="width:100%"></progress>
-                <div style="margin-top:8px">
-                    <button id="uploadPauseBtn" type="button" style="display:none">Pause</button>
-                    <button id="uploadCancelBtn" type="button" style="display:none;margin-left:4px">Cancel</button>
-                    <span id="uploadStatus" style="margin-left:8px;font-size:0.9em;color:#666"></span>
-                </div>
-                <pre id="uploadLog"
-                    style="height:100px;overflow:auto;border:1px solid #ccc;padding:6px;margin-top:8px;background:#f9f9f9;display:none"></pre>
+            <h4><?= $lang['strimport'] ?> <span id="importJobTitle"
+                    style="font-weight:normal;font-size:0.9em;color:#555"></span> -
+                <?= $lang['strprogress'] ?? 'Progress' ?>
+            </h4>
+            <progress id="importProgress" value="0" max="100" style="width:100%"></progress>
+            <div id="importStatus" style="margin-top:4px;font-size:0.9em;color:#666"></div>
+            <div style="margin-top:8px">
+                <button id="importStopBtn" type="button" style="display:none">
+                    <?= $lang['strstop'] ?? 'Stop' ?>
+                </button>
             </div>
-            <div id="importPhase" style="display:none;margin-top:16px">
-                <h4><?= $lang['strimport'] ?> <span id="importJobTitle"
-                        style="font-weight:normal;font-size:0.9em;color:#555"></span> -
-                    <?= $lang['strprogress'] ?? 'Progress' ?>
-                </h4>
-                <progress id="importProgress" value="0" max="100" style="width:100%"></progress>
-                <div id="importStatus" style="margin-top:4px;font-size:0.9em;color:#666"></div>
-                <pre id="importLog"
-                    style="height:200px;overflow:auto;border:1px solid #ccc;padding:6px;margin-top:8px;background:#f9f9f9"></pre>
-            </div>
+            <pre id="importLog"
+                style="height:200px;overflow:auto;border:1px solid #ccc;padding:6px;margin-top:8px;background:#f9f9f9"></pre>
         </div>
 
         <script type="module" src="js/import/stream_upload.js"></script>

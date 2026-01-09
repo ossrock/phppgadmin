@@ -322,6 +322,9 @@ class SqlParser
         for ($i = 0; $i < $len; $i++) {
             if ($i < $start) {
                 $i = $start;
+                if ($i >= $len) {
+                    break;
+                }
             }
             $c = $buf[$i];
 
