@@ -1,19 +1,18 @@
 <?php
 
-use PhpPgAdmin\Database\Actions\RoleActions;
-use PhpPgAdmin\Database\Import\ImportExecutor;
-use PhpPgAdmin\Database\Import\LogCollector;
-use PhpPgAdmin\Database\Import\SessionSettingsApplier;
-use PhpPgAdmin\Database\Import\CopyStreamHandler;
-use PhpPgAdmin\Database\Import\Exception\CopyException;
 use PhpPgAdmin\Core\AppContainer;
+use PhpPgAdmin\Database\Import\SqlParser;
+use PhpPgAdmin\Database\Actions\RoleActions;
+use PhpPgAdmin\Database\Import\LogCollector;
+use PhpPgAdmin\Database\Import\ImportExecutor;
+use PhpPgAdmin\Database\Import\CopyStreamHandler;
+use PhpPgAdmin\Database\Import\SessionSettingsApplier;
+use PhpPgAdmin\Database\Import\Exception\CopyException;
 
 // dbimport.php
 // API endpoint for chunked file upload and import processing
 // This is an API endpoint that expects JSON requests and returns JSON responses.
 // Authentication is checked via session (user must be logged in via main app).
-
-require_once __DIR__ . '/libraries/bootstrap.php';
 
 // After bootstrap, check if we have authentication
 // If $_server_info is not set, the user was redirected to login and this won't execute
@@ -24,6 +23,8 @@ if (!isset($_REQUEST['server'])) {
     echo json_encode(['error' => 'server parameter required']);
     exit;
 }
+
+require_once __DIR__ . '/libraries/bootstrap.php';
 
 /**
  * New streaming import handler: stateless per-request chunk processing.
@@ -42,19 +43,17 @@ function handle_process_chunk_stream(): void
         $pg = AppContainer::getPostgres();
 
         // Identify this import stream so multiple uploads can run in parallel without
-        // stomping each other's session state. The client sends import_session_id; if
-        // missing, fall back to a default bucket for backward compatibility.
-        $importSessionId = isset($_REQUEST['import_session_id']) && $_REQUEST['import_session_id'] !== ''
-            ? (string) $_REQUEST['import_session_id']
-            : 'default';
+        // stomping each other's session state.
+        $importSessionId = isset($_REQUEST['import_session_id']) ?? null;
+        if (empty($importSessionId)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'import_session_id parameter required']);
+            return;
+        }
 
         // Initialize namespaced session storage for stream imports.
-        if (!isset($_SESSION['stream_import']) || !is_array($_SESSION['stream_import'])) {
+        if (!isset($_SESSION['stream_import'])) {
             $_SESSION['stream_import'] = [];
-        }
-        // Back-compat: migrate legacy flat structure into default bucket.
-        if (!isset($_SESSION['stream_import']['default']) && isset($_SESSION['stream_import']['copy_active'])) {
-            $_SESSION['stream_import'] = ['default' => $_SESSION['stream_import']];
         }
 
         if (!isset($_SESSION['stream_import'][$importSessionId])) {
@@ -73,26 +72,6 @@ function handle_process_chunk_stream(): void
             ];
         }
         $streamState = &$_SESSION['stream_import'][$importSessionId];
-
-        // If the client specified a target database for this import, ensure
-        // our connection is to that database. This avoids cases where the
-        // global connection points to the server's default DB (e.g. 'postgres').
-        $targetDb = $_REQUEST['database'] ?? null;
-        if (!empty($targetDb)) {
-            try {
-                $pgTarget = $misc->getDatabaseAccessor($targetDb);
-                if ($pgTarget !== null) {
-                    $pg = $pgTarget;
-                    AppContainer::setPostgres($pg);
-                    // Switched database for this import session
-                }
-            } catch (Throwable $e) {
-                // Reconnection failed — report and abort
-                http_response_code(500);
-                echo json_encode(['error' => 'Failed to connect to target database', 'detail' => $e->getMessage()]);
-                return;
-            }
-        }
 
         // Validate server/session context (ensures user is authenticated)
         $serverInfo = $misc->getServerInfo();
@@ -321,10 +300,11 @@ function handle_process_chunk_stream(): void
                 $streamState['copy_active'] = false;
                 $streamState['copy_header'] = '';
                 $after = substr($decoded, $pos + strlen($m[0][0]));
-                $split = \PhpPgAdmin\Database\Import\SqlParser::parseFromString($after, '');
+                $split = SqlParser::parseFromString($after, '', false, !empty($streamState['standard_conforming_strings']));
                 $statements = $split['statements'];
                 $remainder = $split['remainder'];
                 $metaCommands = $split['meta'] ?? [];
+                $streamState['standard_conforming_strings'] = !empty($split['standard_conforming_strings']);
             } else {
                 // No terminator yet: send only complete lines in this chunk
                 $lastNl = strrpos($decoded, "\n");
@@ -351,10 +331,11 @@ function handle_process_chunk_stream(): void
                 $rest = substr($decoded, $headerEnd);
                 if (preg_match($copyTermPattern, $rest, $m, PREG_OFFSET_CAPTURE)) {
                     // Header and terminator both present in same chunk; let parser handle it fully
-                    $split = \PhpPgAdmin\Database\Import\SqlParser::parseFromString($decoded, '');
+                    $split = SqlParser::parseFromString($decoded, '', false, !empty($streamState['standard_conforming_strings']));
                     $statements = $split['statements'];
                     $remainder = $split['remainder'];
                     $metaCommands = $split['meta'] ?? [];
+                    $streamState['standard_conforming_strings'] = !empty($split['standard_conforming_strings']);
                 } else {
                     // Activate COPY streaming and send complete lines from rest
                     $streamState['copy_active'] = true;
@@ -376,10 +357,11 @@ function handle_process_chunk_stream(): void
                 }
             } else {
                 // Normal path: Parse statements using SqlParser with COPY and comment/meta handling
-                $split = \PhpPgAdmin\Database\Import\SqlParser::parseFromString($decoded, '');
+                $split = SqlParser::parseFromString($decoded, '', false, !empty($streamState['standard_conforming_strings']));
                 $statements = $split['statements'];
                 $remainder = $split['remainder'];
                 $metaCommands = $split['meta'] ?? [];
+                $streamState['standard_conforming_strings'] = !empty($split['standard_conforming_strings']);
             }
         }
 

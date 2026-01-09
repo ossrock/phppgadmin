@@ -3,8 +3,7 @@
 namespace PhpPgAdmin\Gui;
 
 use PhpPgAdmin\Core\AbstractContext;
-use PhpPgAdmin\Core\AppContainer;
-use PhpPgAdmin\Database\Import\CompressionReader;
+use PhpPgAdmin\Database\Export\Compression\CompressionFactory;
 use PhpPgAdmin\Database\Actions\RoleActions;
 
 class ImportFormRenderer extends AbstractContext
@@ -20,7 +19,7 @@ class ImportFormRenderer extends AbstractContext
         $maxAttr = $maxSize > 0 ? 'data-import-max-size="' . htmlspecialchars((string) $maxSize) . '"' : '';
         $chunkAttr = $chunkSize > 0 ? 'data-import-chunk-size="' . htmlspecialchars((string) $chunkSize) . '"' : '';
 
-        $caps = CompressionReader::capabilities();
+        $caps = CompressionFactory::capabilities();
         $capsPrintable = array_filter($caps, function ($v) {
             return $v;
         });

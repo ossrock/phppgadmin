@@ -28,7 +28,7 @@ class SqlParser
      * On partial progress (no ';' yet, but at least one tuple emitted), returns:
      *  ['statements' => string[], 'remainder' => string]
      */
-    private static function tryStreamInsertValues(string $buf, int $start, int $len, int $maxTuplesPerStmt = 500, int $maxStmtBytes = 262144): ?array
+    private static function tryStreamInsertValues(string $buf, int $start, int $len, bool $stdConforming = true, int $maxTuplesPerStmt = 500, int $maxStmtBytes = 262144): ?array
     {
         $sub = substr($buf, $start);
         // quick filter: must look like INSERT ... VALUES
@@ -61,6 +61,7 @@ class SqlParser
         $tupleStart = null;
         $depth = 0;
         $inS = false;
+        $stringBackslashEscapes = false;
         $inD = false;
         $inDol = null;
 
@@ -81,8 +82,9 @@ class SqlParser
             $ch = $buf[$j];
 
             if ($inS) {
-                // Handle backslash escapes (e.g. E'...\'...') by skipping the escaped char.
-                if ($ch === "\\") {
+                // Handle backslash escapes (e.g. E'...\'...') by skipping
+                // the escaped char.
+                if ($stringBackslashEscapes && $ch === "\\") {
                     if (($j + 1) < $len) {
                         $j += 2;
                         continue;
@@ -91,11 +93,14 @@ class SqlParser
                     continue;
                 }
                 if ($ch === "'") {
-                    if (($j + 1) < $len && $buf[$j + 1] === "'") {
-                        $j += 2;
-                        continue;
+                    if (!$stringBackslashEscapes) {
+                        if (($j + 1) < $len && $buf[$j + 1] === "'") {
+                            $j += 2;
+                            continue;
+                        }
                     }
                     $inS = false;
+                    $stringBackslashEscapes = false;
                 }
                 $j++;
                 continue;
@@ -135,6 +140,14 @@ class SqlParser
 
             if ($ch === "'") {
                 $inS = true;
+                $isEscapeLiteral = false;
+                if ($j > 0 && ($buf[$j - 1] === 'E' || $buf[$j - 1] === 'e')) {
+                    $prev = ($j - 2) >= 0 ? $buf[$j - 2] : '';
+                    if (!preg_match('/[A-Za-z0-9_]/', $prev)) {
+                        $isEscapeLiteral = true;
+                    }
+                }
+                $stringBackslashEscapes = (!$stdConforming) || $isEscapeLiteral;
                 $j++;
                 continue;
             }
@@ -280,7 +293,7 @@ class SqlParser
      * Parse from a raw string chunk plus existing buffer. Useful for HTTP streaming.
      * Returns same structure as parseFromReader; 'eof' is false by default.
      */
-    public static function parseFromString(string $data, string $existingBuffer = '', bool $eof = false): array
+    public static function parseFromString(string $data, string $existingBuffer = '', bool $eof = false, bool $stdConformingInitial = true): array
     {
         // Reuse the logic of parseFromReader by inlining the same steps
         $buf = $existingBuffer . $data;
@@ -293,7 +306,7 @@ class SqlParser
                 'eof' => $eof,
                 'remainder' => $existingBuffer,
                 'meta' => $meta,
-                'standard_conforming_strings' => true,
+                'standard_conforming_strings' => $stdConformingInitial,
             ];
         }
 
@@ -304,7 +317,7 @@ class SqlParser
         $inDouble = false;
         $inBlock = false;
         $inDollar = null;
-        $stdConforming = true;
+        $stdConforming = $stdConformingInitial;
 
         for ($i = 0; $i < $len; $i++) {
             if ($i < $start) {
@@ -430,7 +443,7 @@ class SqlParser
                     }
                 }
                 // INSERT ... VALUES streaming
-                $ins = self::tryStreamInsertValues($buf, $start, $len);
+                $ins = self::tryStreamInsertValues($buf, $start, $len, $stdConforming);
                 if (is_array($ins)) {
                     if (!empty($ins['statements'])) {
                         foreach ($ins['statements'] as $s) {

@@ -4,8 +4,7 @@ namespace PhpPgAdmin\Gui;
 
 use PhpPgAdmin\Core\AppContainer;
 use PhpPgAdmin\Database\Actions\DatabaseActions;
-use PhpPgAdmin\Database\Export\FormatterFactory;
-use PhpPgAdmin\Database\Import\CompressionReader;
+use PhpPgAdmin\Database\Export\Compression\CompressionFactory;
 
 /**
  * DumpRenderer - Renders database export forms for all subject types
@@ -40,7 +39,7 @@ class DumpRenderer
             $databaseActions = new DatabaseActions($this->pg);
             $databases = $databaseActions->getDatabases(null, true);
         }
-        $compressionCaps = CompressionReader::capabilities();
+        $compressionCaps = CompressionFactory::capabilities();
 
         ?>
         <style>

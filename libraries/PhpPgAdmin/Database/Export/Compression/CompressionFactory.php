@@ -28,4 +28,41 @@ class CompressionFactory
                 return null;
         }
     }
+
+    /**
+     * Returns support flags for compression formats based on available PHP extensions.
+     *
+     * @return array{gzip:bool,zip:bool,bzip2:bool}
+     */
+    public static function capabilities(): array
+    {
+        static $caps = null;
+        if ($caps !== null) {
+            return $caps;
+        }
+
+        $caps = [
+            'gzip' => function_exists('gzopen'),
+            'zip' => class_exists('ZipArchive'),
+            'bzip2' => function_exists('bzopen'),
+        ];
+
+        return $caps;
+    }
+
+    /**
+     * Checks if given compression type is supported.
+     *
+     * @param string $type
+     * @return bool
+     */
+    public static function isSupported(string $type): bool
+    {
+        if ($type === 'plain' || $type === 'download') {
+            return true;
+        }
+
+        $caps = self::capabilities();
+        return isset($caps[$type]) && (bool) $caps[$type];
+    }
 }

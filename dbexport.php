@@ -1,7 +1,7 @@
 <?php
 
 use PhpPgAdmin\Core\AppContainer;
-use PhpPgAdmin\Database\DumpManager;
+use PhpPgAdmin\Database\Export\DumpManager;
 use PhpPgAdmin\Gui\ExportOutputRenderer;
 use PhpPgAdmin\Database\Dump\DumpFactory;
 use PhpPgAdmin\Database\Actions\DatabaseActions;

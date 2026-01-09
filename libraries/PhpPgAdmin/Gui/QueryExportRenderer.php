@@ -3,7 +3,7 @@
 namespace PhpPgAdmin\Gui;
 
 use PhpPgAdmin\Core\AppContainer;
-use PhpPgAdmin\Database\Import\CompressionReader;
+use PhpPgAdmin\Database\Export\Compression\CompressionFactory;
 
 /**
  * QueryExportRenderer - Renders export form for SQL query results
@@ -29,7 +29,7 @@ class QueryExportRenderer
      */
     public function renderExportForm($query, $params = [])
     {
-        $compressionCaps = CompressionReader::capabilities();
+        $compressionCaps = CompressionFactory::capabilities();
         ?>
         <form action="dataexport.php" id="export-form" method="get">
 
