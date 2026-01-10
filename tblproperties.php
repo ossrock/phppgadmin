@@ -1,16 +1,17 @@
 <?php
 
+use PhpPgAdmin\Gui\DumpRenderer;
 use PhpPgAdmin\Core\AppContainer;
+use PhpPgAdmin\Gui\ColumnFormRenderer;
+use PhpPgAdmin\Gui\ImportFormRenderer;
+use PhpPgAdmin\Gui\QueryExportRenderer;
 use PhpPgAdmin\Database\Actions\RoleActions;
-use PhpPgAdmin\Database\Actions\TablespaceActions;
 use PhpPgAdmin\Database\Actions\TypeActions;
 use PhpPgAdmin\Database\Actions\TableActions;
 use PhpPgAdmin\Database\Actions\ColumnActions;
 use PhpPgAdmin\Database\Actions\SchemaActions;
 use PhpPgAdmin\Database\Actions\ConstraintActions;
-use PhpPgAdmin\Gui\DumpRenderer;
-use PhpPgAdmin\Gui\ColumnFormRenderer;
-use PhpPgAdmin\Gui\QueryExportRenderer;
+use PhpPgAdmin\Database\Actions\TablespaceActions;
 
 /**
  * List tables in a database
@@ -219,60 +220,14 @@ function doImport($msg = '')
 {
 	//$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
-	$lang = AppContainer::getLang();
+	//$lang = AppContainer::getLang();
 
 	$misc->printTrail('table');
 	$misc->printTabs('table', 'import');
 	$misc->printMsg($msg);
 
-	// Check that file uploads are enabled
-	if (!ini_get('file_uploads')) {
-		echo "<p>{$lang['strnouploads']}</p>\n";
-		return;
-	}
-
-	// Don't show upload option if max size of uploads is zero
-	$max_size = $misc->inisizeToBytes(ini_get('upload_max_filesize'));
-	if (!is_double($max_size) || $max_size == 0) {
-		return;
-	}
-
-	?>
-	<form action="dataimport.php" method="post" enctype="multipart/form-data">
-		<table>
-			<tr>
-				<th class="data left required"><?= $lang['strformat'] ?></th>
-				<td><select name="format">
-						<option value="auto"><?= $lang['strauto'] ?></option>
-						<option value="csv">CSV</option>
-						<option value="tab"><?= $lang['strtabbed'] ?></option>
-						<?php if (function_exists('xml_parser_create')): ?>
-							<option value="xml">XML</option>
-						<?php endif; ?>
-					</select></td>
-			</tr>
-			<tr>
-				<th class="data left required"><?= $lang['strallowednulls'] ?></th>
-				<td>
-					<label><input type="checkbox" name="allowednulls[0]" value="\N"
-							checked="checked" /><?= $lang['strbackslashn'] ?></label><br />
-					<label><input type="checkbox" name="allowednulls[1]" value="NULL" />NULL</label><br />
-					<label><input type="checkbox" name="allowednulls[2]" value="" /><?= $lang['stremptystring'] ?></label>
-				</td>
-			</tr>
-			<tr>
-				<th class="data left required"><?= $lang['strfile'] ?></th>
-				<td><input type="hidden" name="MAX_FILE_SIZE" value="<?= $max_size ?>" /><input type="file" name="source" />
-				</td>
-			</tr>
-		</table>
-		<p><input type="hidden" name="action" value="import" />
-			<?= $misc->form ?>
-			<input type="hidden" name="table" value="<?= html_esc($_REQUEST['table']) ?>" />
-			<input type="submit" value="<?= $lang['strimport'] ?>" />
-		</p>
-	</form>
-	<?php
+	$renderer = new ImportFormRenderer();
+	$renderer->renderDataImportForm('table');
 }
 
 function doAddColumn($msg = '')

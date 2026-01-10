@@ -39,7 +39,7 @@ class DatabaseDumper extends AbstractDumper
             if (!empty($options['clean'])) {
                 $this->write("DROP DATABASE IF EXISTS \"" . addslashes($c_database) . "\" CASCADE;\n");
             }
-            $this->write("CREATE DATABASE " . $this->getIfNotExists($options) . "\"" . addslashes($c_database) . "\";\n");
+            $this->write("CREATE DATABASE \"" . addslashes($c_database) . "\";\n");
         }
 
         if (empty($options['suppress_connect'])) {

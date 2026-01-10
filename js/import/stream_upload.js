@@ -8,8 +8,9 @@ import {
 	sniffMagicType,
 	getServerCaps,
 	fnv1a64,
+	appendServerToUrl,
+	logImport,
 } from "./utils.js";
-import { appendServerToUrl } from "./api.js";
 import { createUniversalDecompressStream, gzipSync } from "./decompressor.js";
 
 function utf8Encode(str) {
@@ -104,6 +105,8 @@ async function startStreamUpload() {
 	// Wire up stop button
 	if (importStopBtn) {
 		importStopBtn.style.display = "inline-block";
+		importStopBtn.disabled = false;
+
 		importStopBtn.onclick = () => {
 			stopRequested = true;
 			importStopBtn.disabled = true;
@@ -125,7 +128,7 @@ async function startStreamUpload() {
 	const skipInput = document.querySelector("input[name='skip_statements']");
 	let stuckCount = 0;
 
-	let decompressor = createUniversalDecompressStream();
+	let decompressor = createUniversalDecompressStream(magic);
 	let decompressionError = null;
 	let decompressionFinished = false;
 
@@ -256,11 +259,7 @@ async function startStreamUpload() {
 				)}s (attempt ${retryCount})...`;
 				console.warn(msg);
 
-				if (importLog) {
-					const line = `[${new Date().toISOString()}] RETRY: ${msg}\n`;
-					importLog.textContent += line;
-					importLog.scrollTop = importLog.scrollHeight;
-				}
+				logImport(`RETRY: ${msg}`);
 
 				if (importStatus) {
 					importStatus.textContent = `${errorType} error - retrying (${retryCount})...`;
@@ -292,23 +291,13 @@ async function startStreamUpload() {
 		}
 
 		// forward logs to UI
-		if (Array.isArray(res.logEntries) && importLog) {
+		if (Array.isArray(res.logEntries)) {
 			for (const e of res.logEntries) {
 				const msg = e.message || e.statement || "";
 				if (msg && typeof msg === "string") {
-					let timeMs;
-					if (typeof e.time === "number") {
-						timeMs = e.time > 1e11 ? e.time : e.time * 1000;
-					} else {
-						timeMs = Date.now();
-					}
-					const line = `[${new Date(timeMs).toISOString()}] ${
-						e.type || "info"
-					}: ${msg}`;
-					importLog.textContent += line + "\n";
+					logImport(msg, e.type || "info", e.time);
 				}
 			}
-			importLog.scrollTop = importLog.scrollHeight;
 		}
 	}
 
@@ -405,11 +394,7 @@ async function startStreamUpload() {
 	}
 
 	// Upload completed successfully
-	if (totalRetries > 0 && importLog) {
-		const successMsg = `[${new Date().toISOString()}] Upload completed successfully after ${totalRetries} total retries.\n`;
-		importLog.textContent += successMsg;
-		importLog.scrollTop = importLog.scrollHeight;
-	}
+	logImport(`Upload completed successfully (${totalRetries} total retries).`);
 
 	// Streaming upload completed — do not run legacy chunked upload logic below.
 	return;

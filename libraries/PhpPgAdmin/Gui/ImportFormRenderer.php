@@ -15,18 +15,11 @@ class ImportFormRenderer extends AbstractContext
         $misc = $this->misc();
         $importCfg = $conf['import'] ?? [];
         $maxSize = (int) ($importCfg['upload_max_size'] ?? 0);
-        $chunkSize = (int) ($importCfg['upload_chunk_size'] ?? ($importCfg['chunk_size'] ?? 0));
+        $chunkSize = (int) ($importCfg['upload_chunk_size'] ?? 2 * 1024 * 1024);
         $maxAttr = $maxSize > 0 ? 'data-import-max-size="' . htmlspecialchars((string) $maxSize) . '"' : '';
         $chunkAttr = $chunkSize > 0 ? 'data-import-chunk-size="' . htmlspecialchars((string) $chunkSize) . '"' : '';
 
         $caps = CompressionFactory::capabilities();
-        $capsPrintable = array_filter($caps, function ($v) {
-            return $v;
-        });
-        $capsPrintable = array_keys($capsPrintable);
-        if (empty($capsPrintable)) {
-            $capsPrintable = ['none'];
-        }
         $capsAttr = sprintf(
             'data-cap-gzip="%s" data-cap-zip="%s" data-cap-bzip2="%s"',
             $caps['gzip'] ? '1' : '0',
@@ -48,8 +41,10 @@ class ImportFormRenderer extends AbstractContext
                 <legend><?= $lang['struploadfile'] ?></legend>
                 <input type="file" name="file" id="file" <?= $capsAttr ?>         <?= $maxAttr ?>         <?= $chunkAttr ?> />
                 <div id="importCompressionCaps" style="margin-top:6px">
-                    <strong><?= $lang['strimportcompressioncaps'] ?? 'Compression support' ?>:</strong>
-                    <?= implode(', ', $capsPrintable) ?>
+                    <strong><?= $lang['strimportcompressioncaps'] ?? 'Compression support' ?>:</strong> gzip, bzip2, zip
+                </div>
+                <div class="info mt-2">
+                    <?= $lang['strimportintro'] ?? 'The import function reads and unpacks a file in the browser chunk by chunk and uploads the parts, where they are processed immediately. With this logic, it should be possible to run long imports and import large files.' ?>
                 </div>
             </fieldset>
 
@@ -78,8 +73,10 @@ class ImportFormRenderer extends AbstractContext
                 <div><label><input type="checkbox" name="opt_defer_self" checked /> <?= $lang['strdeferself'] ?></label></div>
                 <div><label><input type="checkbox" name="opt_allow_drops" />
                         <?= $lang['strimportallowdrops'] ?? 'Allow DROP statements' ?></label></div>
-                <div style="margin-top:8px"><label><input type="checkbox" name="opt_compress_chunks" />
-                        <?= $lang['strimportcompresschunks'] ?? 'Compress chunks with gzip (saves bandwidth)' ?></label></div>
+                <?php if (!empty($caps['gzip'])): ?>
+                    <div style="margin-top:8px"><label><input type="checkbox" name="opt_compress_chunks" />
+                            <?= $lang['strimportcompresschunks'] ?? 'Compress chunks with gzip (saves bandwidth)' ?></label></div>
+                <?php endif; ?>
             </fieldset>
 
             <fieldset>
@@ -118,6 +115,47 @@ class ImportFormRenderer extends AbstractContext
         </div>
 
         <script type="module" src="js/import/stream_upload.js"></script>
+        <?php
+    }
+
+    public function renderDataImportForm(string $scope, array $options = []): void
+    {
+        $lang = $this->lang();
+        $misc = $this->misc();
+        ?>
+        <form action="dataimport.php" method="post" enctype="multipart/form-data">
+            <table>
+                <tr>
+                    <th class="data left required"><?= $lang['strformat'] ?></th>
+                    <td><select name="format">
+                            <option value="auto"><?= $lang['strauto'] ?></option>
+                            <option value="csv">CSV</option>
+                            <option value="tab"><?= $lang['strtabbed'] ?></option>
+                            <?php if (function_exists('xml_parser_create')): ?>
+                                <option value="xml">XML</option>
+                            <?php endif; ?>
+                        </select></td>
+                </tr>
+                <tr>
+                    <th class="data left required"><?= $lang['strallowednulls'] ?></th>
+                    <td>
+                        <label><input type="checkbox" name="allowednulls[0]" value="\N"
+                                checked="checked" /><?= $lang['strbackslashn'] ?></label><br />
+                        <label><input type="checkbox" name="allowednulls[1]" value="NULL" />NULL</label><br />
+                        <label><input type="checkbox" name="allowednulls[2]" value="" /><?= $lang['stremptystring'] ?></label>
+                    </td>
+                </tr>
+                <tr>
+                    <th class="data left required"><?= $lang['strfile'] ?></th>
+                    <td><input type="file" name="source" /></td>
+                </tr>
+            </table>
+            <p><input type="hidden" name="action" value="import" />
+                <?= $misc->form ?>
+                <input type="hidden" name="table" value="<?= html_esc($_REQUEST['table']) ?>" />
+                <input type="submit" value="<?= $lang['strimport'] ?>" />
+            </p>
+        </form>
         <?php
     }
 }

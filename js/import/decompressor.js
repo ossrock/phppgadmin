@@ -8,6 +8,7 @@ import {
 	UnzipInflate,
 } from "../lib/fflate/esm/browser.js";
 import { getBzip2Module } from "../lib/bzip2/bzip2-stream.js";
+import { logImport } from "./utils.js";
 
 /**
  * Detect compression format from magic bytes
@@ -83,7 +84,7 @@ class ZipDecoder extends BaseDecoder {
 			if (this.fileHandled) return;
 			this.fileHandled = true;
 
-			console.log(`ZIP: Extracting file: ${file.name}`);
+			logImport(`ZIP: Extracting file: ${file.name}`);
 
 			// Set up the data handler for this file
 			file.ondata = (err, data, final) => {
@@ -102,7 +103,7 @@ class ZipDecoder extends BaseDecoder {
 
 				// When final is true, the file is complete
 				if (final) {
-					console.log("ZIP file extraction complete");
+					logImport("ZIP file extraction complete");
 					this._emit(new Uint8Array(0), true);
 				}
 			};
@@ -312,11 +313,23 @@ function createDecoderForFormat(format) {
  * Create universal decompression stream with auto-detection
  * Returns object with push(chunk, final) method and ondata/onerror callbacks
  */
-export function createUniversalDecompressStream() {
-	let headerBuf = [];
-	let decoder = null;
+export function createUniversalDecompressStream(format) {
 	let finished = false;
-	const HEADER_SIZE = 6;
+	const decoder = createDecoderForFormat(format);
+
+	// Wire up callbacks
+	decoder.ondata = (data, isFinal) => {
+		console.log(
+			`Decompressed chunk: ${data.length} bytes, final=${isFinal}`
+		);
+		if (stream.ondata) stream.ondata(data, isFinal);
+		if (isFinal) finished = true;
+	};
+
+	decoder.onerror = (err) => {
+		if (stream.onerror) stream.onerror(err);
+		finished = true;
+	};
 
 	const stream = {
 		ondata: null, // (chunk: Uint8Array, final: boolean) => void
@@ -327,53 +340,6 @@ export function createUniversalDecompressStream() {
 
 			const u8 =
 				chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
-
-			// Collect header bytes to detect format
-			if (!decoder) {
-				const copyLen = Math.min(
-					HEADER_SIZE - headerBuf.length,
-					u8.length
-				);
-				for (let i = 0; i < copyLen; i++) {
-					headerBuf.push(u8[i]);
-				}
-
-				// Once we have enough header bytes (or reached final), detect format
-				if (headerBuf.length >= HEADER_SIZE || final) {
-					const format = detectFormat(new Uint8Array(headerBuf));
-					console.log(`Detected format: ${format}`);
-
-					decoder = createDecoderForFormat(format);
-
-					// Wire up callbacks
-					decoder.ondata = (data, isFinal) => {
-						console.log(
-							`Decompressed chunk: ${data.length} bytes, final=${isFinal}`
-						);
-						if (stream.ondata) stream.ondata(data, isFinal);
-						if (isFinal) finished = true;
-					};
-
-					decoder.onerror = (err) => {
-						if (stream.onerror) stream.onerror(err);
-						finished = true;
-					};
-				}
-			}
-
-			// If we still don't have a decoder and this is final, treat as raw
-			if (!decoder && final) {
-				console.log("Very small file, treating as raw");
-				decoder = createDecoderForFormat("raw");
-				decoder.ondata = (data, isFinal) => {
-					if (stream.ondata) stream.ondata(data, isFinal);
-					if (isFinal) finished = true;
-				};
-				decoder.onerror = (err) => {
-					if (stream.onerror) stream.onerror(err);
-					finished = true;
-				};
-			}
 
 			// Push entire chunk to decoder (including header portion)
 			if (decoder) {

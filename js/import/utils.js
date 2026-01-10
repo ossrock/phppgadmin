@@ -100,38 +100,37 @@ export const getServerCaps = (fileInput) => {
 	};
 };
 
-export const populateLog = (log) => {
-	if (!Array.isArray(log)) {
-		console.warn("Invalid log data", log);
-		return;
-	}
+export const logImport = (msg, type, time) => {
 	const importLog = el("importLog");
-	if (importLog) {
-		importLog.textContent = log
-			.map((l) => {
-				if (l.time && (l.statement || l.info || l.error)) {
-					let parts = [];
-					if (l.info) parts.push(l.info);
-					if (l.statement) parts.push(l.statement);
-					if (l.error) parts.push("ERROR: " + l.error);
-					return (
-						"[" +
-						new Date(l.time * 1000).toISOString() +
-						"] " +
-						parts.join(" - ")
-					);
-				}
-				return JSON.stringify(l);
-			})
-			.reverse()
-			.join("\n");
+	if (!importLog) return;
+	let timeMs;
+	if (typeof time === "number") {
+		timeMs = time > 1e11 ? time : time * 1000;
+	} else {
+		timeMs = Date.now();
 	}
+	if (!type) type = "info";
+	const line = `[${new Date(
+		timeMs
+	).toISOString()}] ${type.toLowerCase()}: ${msg}`;
+	const span = document.createElement("span");
+	span.textContent = line;
+	span.className = `log-${type.toLowerCase()}`;
+	importLog.appendChild(span);
+	const br = document.createElement("br");
+	importLog.appendChild(br);
+	//importLog.textContent += line + "\n";
+	importLog.scrollTop = importLog.scrollHeight;
+	console.log(msg);
 };
 
-export const log = (msg, type = "import") => {
-	const p = el(type + "Log");
-	if (!p) return;
-	if (type === "upload") p.style.display = "block";
-	const line = "[" + new Date().toISOString() + "] " + msg + "\n";
-	p.textContent = line + p.textContent;
-};
+export function appendServerToUrl(url) {
+	const SERVER = el("importForm").server.value;
+	const DATABASE = el("importForm").database?.value;
+	const SCHEMA = el("importForm").schema?.value;
+	url += url.indexOf("?") === -1 ? "?" : "&";
+	url += "server=" + encodeURIComponent(SERVER);
+	if (DATABASE) url += "&database=" + encodeURIComponent(DATABASE);
+	if (SCHEMA) url += "&schema=" + encodeURIComponent(SCHEMA);
+	return url;
+}
