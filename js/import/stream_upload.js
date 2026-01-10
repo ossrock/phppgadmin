@@ -168,6 +168,7 @@ async function startStreamUpload() {
 	const highWaterMark = chunkSize * 10;
 
 	// send single payload to server (prepends remainder and handles compression/hash)
+	// Includes automatic retry with exponential backoff
 	async function sendPayload(payload, isFinal = false) {
 		let payloadToSend = payload;
 		let chunkCompressed = false;
@@ -195,22 +196,90 @@ async function startStreamUpload() {
 			"dbimport.php?action=process_chunk&" + params.toString()
 		);
 
-		const resp = await fetch(url, {
-			method: "POST",
-			body: payloadToSend,
-			headers: { "Content-Type": "application/octet-stream" },
-		});
-		if (!resp.ok) {
-			const text = await resp.text();
-			throw new Error(`Server error (${resp.status}): ${text}`);
-		}
-		const res = await resp.json();
+		// Retry loop with exponential backoff
+		let retryCount = 0;
+		const maxRetryDelay = 30000; // max 30 seconds between retries
+		while (true) {
+			if (stopRequested) {
+				throw new Error("Upload stopped by user");
+			}
 
-		if (res.error && res.error.includes("checksum")) {
-			throw new Error(`Checksum mismatch: ${res.error}`);
-		}
+			try {
+				const resp = await fetch(url, {
+					method: "POST",
+					body: payloadToSend,
+					headers: { "Content-Type": "application/octet-stream" },
+				});
+				if (!resp.ok) {
+					const text = await resp.text();
+					throw new Error(`Server error (${resp.status}): ${text}`);
+				}
+				const res = await resp.json();
 
-		// Update remainder/offset from server
+				if (res.error && res.error.includes("checksum")) {
+					// Checksum error - retry
+					throw new Error(`Checksum mismatch: ${res.error}`);
+				}
+
+				// Success - break out of retry loop
+				if (retryCount > 0) {
+					console.log(
+						`Chunk sent successfully after ${retryCount} retries`
+					);
+				}
+				return res;
+			} catch (err) {
+				retryCount++;
+				totalRetries++;
+
+				// Determine if this is a network error or server error
+				const isNetworkError =
+					err.name === "TypeError" ||
+					err.message.includes("Failed to fetch") ||
+					err.message.includes("NetworkError") ||
+					err.message.includes("checksum");
+
+				const errorType = isNetworkError
+					? "Network/checksum"
+					: "Server";
+
+				// Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (capped)
+				const delay = Math.min(
+					1000 * Math.pow(2, Math.min(retryCount - 1, 5)),
+					maxRetryDelay
+				);
+
+				const msg = `${errorType} error: ${
+					err.message
+				}. Retrying in ${Math.round(
+					delay / 1000
+				)}s (attempt ${retryCount})...`;
+				console.warn(msg);
+
+				if (importLog) {
+					const line = `[${new Date().toISOString()}] RETRY: ${msg}\n`;
+					importLog.textContent += line;
+					importLog.scrollTop = importLog.scrollHeight;
+				}
+
+				if (importStatus) {
+					importStatus.textContent = `${errorType} error - retrying (${retryCount})...`;
+				}
+
+				// Wait before retry, but check stopRequested periodically
+				for (let i = 0; i < delay; i += 100) {
+					if (stopRequested) {
+						throw new Error("Upload stopped by user during retry");
+					}
+					await new Promise((r) => setTimeout(r, 100));
+				}
+				// Loop continues to retry
+			}
+		}
+	}
+
+	// Process server response
+	async function processResponse(res, payload) {
 		if (typeof res.remainder === "string") {
 			remainder = res.remainder;
 		} else {
@@ -274,7 +343,8 @@ async function startStreamUpload() {
 					payload.set(remBytes, 0);
 					payload.set(chunk, remBytes.length);
 				}
-				await sendPayload(payload, isFinalSend);
+				const res = await sendPayload(payload, isFinalSend);
+				await processResponse(res, payload);
 				if (importProgress)
 					importProgress.value = Math.min(
 						100,
@@ -332,6 +402,13 @@ async function startStreamUpload() {
 			throw new Error(
 				`Decompression failed: ${decompressionError.message}`
 			);
+	}
+
+	// Upload completed successfully
+	if (totalRetries > 0 && importLog) {
+		const successMsg = `[${new Date().toISOString()}] Upload completed successfully after ${totalRetries} total retries.\n`;
+		importLog.textContent += successMsg;
+		importLog.scrollTop = importLog.scrollHeight;
 	}
 
 	// Streaming upload completed — do not run legacy chunked upload logic below.
