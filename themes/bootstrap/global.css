@@ -749,3 +749,13 @@ table.sql-function.properties {
 	color: #d14;
 	font-weight: bold;
 }
+
+.importStatus {
+	color: #3a6b7a;
+}
+
+.importLog {
+	border-radius: 3px;
+	box-shadow: inset 0 0 5px 0 rgba(0, 0, 0, 0.1);
+	font-size: 0.95em;
+}

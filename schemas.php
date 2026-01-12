@@ -3,7 +3,7 @@
 use PhpPgAdmin\Core\AppContainer;
 use PhpPgAdmin\Database\Actions\RoleActions;
 use PhpPgAdmin\Database\Actions\SchemaActions;
-use PhpPgAdmin\Gui\DumpRenderer;
+use PhpPgAdmin\Gui\ExportFormRenderer;
 use PhpPgAdmin\Gui\ImportFormRenderer;
 
 /**
@@ -377,9 +377,9 @@ function doExport($msg = '')
 	$misc->printTabs('schema', 'export');
 	$misc->printMsg($msg);
 
-	// Use the unified DumpRenderer for the export form
-	$dumpRenderer = new DumpRenderer();
-	$dumpRenderer->renderExportForm('schema', []);
+	// Use the unified ExportFormRenderer for the export form
+	$exportRenderer = new ExportFormRenderer();
+	$exportRenderer->renderExportForm('schema', []);
 }
 
 

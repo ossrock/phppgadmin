@@ -1,6 +1,5 @@
 <?php
 
-use PhpPgAdmin\Gui\DumpRenderer;
 use PhpPgAdmin\Core\AppContainer;
 use PhpPgAdmin\Gui\ColumnFormRenderer;
 use PhpPgAdmin\Gui\ImportFormRenderer;

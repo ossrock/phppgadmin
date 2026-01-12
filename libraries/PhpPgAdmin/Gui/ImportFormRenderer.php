@@ -94,20 +94,21 @@ class ImportFormRenderer extends AbstractContext
             </div>
         </form>
 
-        <div id="importUI" style="display:none;margin-top:16px">
-            <h4><?= $lang['strimport'] ?> <span id="importJobTitle"
-                    style="font-weight:normal;font-size:0.9em;color:#555"></span> -
+        <div id="importUI" class="mt-3" style="display:none;">
+            <h4><?= $lang['strimport'] ?>
+                <span id="importTitle" class="importTitle"></span> -
                 <?= $lang['strprogress'] ?? 'Progress' ?>
             </h4>
             <progress id="importProgress" value="0" max="100" style="width:100%"></progress>
-            <div id="importStatus" style="margin-top:4px;font-size:0.9em;color:#666"></div>
-            <div style="margin-top:8px">
+            <div id="importStatus" class="importStatus">
+                <?= $lang['strimport'] ?>
+            </div>
+            <div class="mt-2">
                 <button id="importStopBtn" type="button" style="display:none">
                     <?= $lang['strstop'] ?? 'Stop' ?>
                 </button>
             </div>
-            <pre id="importLog"
-                style="height:200px;overflow:auto;border:1px solid #ccc;padding:6px;margin-top:8px;background:#f9f9f9"></pre>
+            <pre id="importLog" class="importLog"></pre>
         </div>
 
         <script type="module" src="js/import/stream_upload.js"></script>
@@ -225,20 +226,20 @@ class ImportFormRenderer extends AbstractContext
             </div>
         </form>
 
-        <div id="importUI" style="display:none;margin-top:16px">
-            <h4><?= $lang['strimport'] ?> <span id="importJobTitle"
-                    style="font-weight:normal;font-size:0.9em;color:#555"></span> -
+        <div id="importUI" class="mt-3" style="display:none;">
+            <h4><?= $lang['strimport'] ?> <span id="importTitle" class="importTitle"></span> -
                 <?= $lang['strprogress'] ?? 'Progress' ?>
             </h4>
             <progress id="importProgress" value="0" max="100" style="width:100%"></progress>
-            <div id="importStatus" style="margin-top:4px;font-size:0.9em;color:#666"></div>
-            <div style="margin-top:8px">
+            <div id="importStatus" class="importStatus">
+                <?= $lang['strimport'] ?>
+            </div>
+            <div class="mt-2">
                 <button id="importStopBtn" type="button" style="display:none">
                     <?= $lang['strstop'] ?? 'Stop' ?>
                 </button>
             </div>
-            <pre id="importLog"
-                style="height:200px;overflow:auto;border:1px solid #ccc;padding:6px;margin-top:8px;background:#f9f9f9"></pre>
+            <pre id="importLog" class="importLog"></pre>
         </div>
 
         <script type="module" src="js/import/stream_upload.js"></script>

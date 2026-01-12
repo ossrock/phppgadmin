@@ -1,6 +1,5 @@
 <?php
 
-use PhpPgAdmin\Gui\DumpRenderer;
 use PhpPgAdmin\Core\AppContainer;
 use PhpPgAdmin\Gui\QueryExportRenderer;
 use PhpPgAdmin\Database\Actions\RoleActions;

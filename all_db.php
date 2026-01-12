@@ -4,7 +4,7 @@ use PhpPgAdmin\Core\AppContainer;
 use PhpPgAdmin\Database\Actions\RoleActions;
 use PhpPgAdmin\Database\Actions\DatabaseActions;
 use PhpPgAdmin\Database\Actions\TablespaceActions;
-use PhpPgAdmin\Gui\DumpRenderer;
+use PhpPgAdmin\Gui\ExportFormRenderer;
 use PhpPgAdmin\Gui\ImportFormRenderer;
 
 /**
@@ -333,8 +333,7 @@ function doCreate($msg = '')
 				<tr>
 					<th class="data left"><?= $lang['strcomment']; ?></th>
 					<td>
-						<textarea name="formComment" rows="3"
-							cols="32"><?= html_esc($_POST['formComment']); ?></textarea>
+						<textarea name="formComment" rows="3" cols="32"><?= html_esc($_POST['formComment']); ?></textarea>
 					</td>
 				</tr>
 			<?php endif; ?>
@@ -431,8 +430,8 @@ function doExport($msg = '')
 	$misc->printMsg($msg);
 
 	// Use the unified DumpRenderer for the export form
-	$dumpRenderer = new DumpRenderer();
-	$dumpRenderer->renderExportForm('server', []);
+	$exportRenderer = new ExportFormRenderer();
+	$exportRenderer->renderExportForm('server', []);
 }
 
 /**

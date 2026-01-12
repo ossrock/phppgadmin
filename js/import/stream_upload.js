@@ -110,6 +110,8 @@ async function startStreamUpload() {
 	const importStatus = el("importStatus");
 	const importLog = el("importLog");
 	const importStopBtn = el("importStopBtn");
+	const importTitle = el("importTitle");
+	if (importTitle) importTitle.textContent = file.name;
 
 	if (importUI) importUI.style.display = "block";
 	if (importLog) importLog.textContent = "";
@@ -140,8 +142,7 @@ async function startStreamUpload() {
 	let offset = 0;
 	let bytesRead = 0; // track compressed input bytes for progress
 	let remainder = ""; // server-provided incomplete tail
-	const skipInput = document.querySelector("input[name='skip_statements']");
-	let stuckCount = 0;
+	//const skipInput = document.querySelector("input[name='skip_statements']");
 
 	let decompressor = createUniversalDecompressStream(magic);
 	let decompressionError = null;

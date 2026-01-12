@@ -1,6 +1,6 @@
 <?php
 
-use PhpPgAdmin\Gui\DumpRenderer;
+use PhpPgAdmin\Gui\ExportFormRenderer;
 use PhpPgAdmin\Core\AppContainer;
 use PhpPgAdmin\Gui\ImportFormRenderer;
 use PhpPgAdmin\Database\Actions\RoleActions;
@@ -342,8 +342,8 @@ function doExport($msg = '')
 	$misc->printMsg($msg);
 
 	// Use the unified DumpRenderer for the export form
-	$dumpRenderer = new DumpRenderer();
-	$dumpRenderer->renderExportForm('database', []);
+	$exportRenderer = new ExportFormRenderer();
+	$exportRenderer->renderExportForm('database', []);
 }
 
 /**

@@ -660,3 +660,18 @@ pre code.hljs {
 .hljs-quoted-identifier {
 	color: #318495;
 }
+
+.importStatus {
+	/*margin-top: 4px;*/
+	/*font-size: 0.9em;*/
+	color: #666;
+}
+
+.importLog {
+	height: 200px;
+	overflow: auto;
+	border: 1px solid #ccc;
+	padding: 6px;
+	margin-top: 8px;
+	background: #f9f9f9;
+}

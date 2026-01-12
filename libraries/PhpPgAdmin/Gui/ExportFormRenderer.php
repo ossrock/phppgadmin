@@ -10,7 +10,7 @@ use PhpPgAdmin\Database\Export\Compression\CompressionFactory;
  * DumpRenderer - Renders database export forms for all subject types
  * Unifies export form rendering across server, database, schema, table, and view contexts
  */
-class DumpRenderer
+class ExportFormRenderer
 {
     private $pg;
     private $misc;
@@ -174,33 +174,10 @@ class DumpRenderer
                         <input type="radio" id="format_sql" name="output_format" value="sql" checked="checked" />
                         <label for="format_sql">SQL</label>
                     </div>
-                    <?php if (in_array($subject, ['table', 'view'])): ?>
-                        <div class="mx-1">
-                            <input type="radio" id="format_csv" name="output_format" value="csv" />
-                            <label for="format_csv">CSV</label>
-                        </div>
-                        <div class="mx-1">
-                            <input type="radio" id="format_tab" name="output_format" value="tab" />
-                            <label for="format_tab">Tab-Delimited</label>
-                        </div>
-                        <div class="mx-1">
-                            <input type="radio" id="format_html" name="output_format" value="html" />
-                            <label for="format_html">XHTML</label>
-                        </div>
-                        <div class="mx-1">
-                            <input type="radio" id="format_xml" name="output_format" value="xml" />
-                            <label for="format_xml">XML</label>
-                        </div>
-                        <div class="mx-1">
-                            <input type="radio" id="format_json" name="output_format" value="json" />
-                            <label for="format_json">JSON</label>
-                        </div>
-                    <?php endif; ?>
                 </div>
 
                 <!-- INSERT Format Options (only shown when SQL format is selected and data is included) -->
-                <div id="insert_format_options"
-                    style="display:none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #ccc;">
+                <div id="insert_format_options" class="mt-3 pt-1" style="display:none; border-top: 1px solid #ccc;">
                     <p><strong><?= $this->lang['strinsertformat_desc']; ?></strong></p>
                     <div style="margin-left: 20px;">
                         <div>
