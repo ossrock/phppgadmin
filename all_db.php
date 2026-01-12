@@ -424,14 +424,28 @@ function doExport($msg = '')
 {
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$pg = AppContainer::getPostgres();
 
 	$misc->printTrail('server');
 	$misc->printTabs('server', 'export');
 	$misc->printMsg($msg);
 
+	// Get list of databases for database selection fieldset
+	$databaseNames = [];
+	$databaseActions = new DatabaseActions($pg);
+	$databases = $databaseActions->getDatabases(null, true);
+	while (!$databases->EOF) {
+		$databaseNames[] = $databases->fields['datname'];
+		$databases->moveNext();
+	}
+
 	// Use the unified DumpRenderer for the export form
 	$exportRenderer = new ExportFormRenderer();
-	$exportRenderer->renderExportForm('server', []);
+	$exportRenderer->renderExportForm('server', [
+		'name' => 'databases',
+		'icon' => 'Database',
+		'objects' => $databaseNames
+	]);
 }
 
 /**

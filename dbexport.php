@@ -27,6 +27,12 @@ AppContainer::setSkipHtmlFrame(true);
 $pg = AppContainer::getPostgres();
 $misc = AppContainer::getMisc();
 
+$subjectObjectMap = [
+	'server' => 'database',
+	'database' => 'schema',
+	'schema' => 'table',
+];
+
 // Parameter handling
 // DumpRenderer uses output_format (sql/csv/tab/html/xml/json) and insert_format (copy/multi/single for SQL only)
 $output_format = $_REQUEST['output_format'] ?? 'sql';
@@ -75,7 +81,7 @@ if ($use_internal) {
 		'export_tablespaces' => isset($_REQUEST['export_tablespaces']),
 		'structure_only' => ($_REQUEST['what'] === 'structureonly'),
 		'data_only' => ($_REQUEST['what'] === 'dataonly'),
-		'databases' => isset($_REQUEST['databases']) ? (array) $_REQUEST['databases'] : [],
+		'objects' => isset($_REQUEST['objects']) ? (array) $_REQUEST['objects'] : [],
 		'insert_format' => $insert_format,
 		'truncate_tables' => isset($_REQUEST['truncate_tables']),
 		'add_create_database' => isset($_REQUEST['add_create_database']),
@@ -108,9 +114,10 @@ if ($use_internal) {
 	}
 
 	// If multiple databases are requested, iterate through each
-	if ($subject === 'database' && !empty($options['databases'])) {
-		foreach ($options['databases'] as $db_name) {
-			$params['database'] = $db_name;
+	if (!empty($options['objects'])) {
+		foreach ($options['objects'] as $obj_name) {
+			$name = $subjectObjectMap[$subject] ?? '';
+			$params[$name] = $obj_name;
 			$dumper->dump($subject, $params, $options);
 
 			// Flush stream periodically

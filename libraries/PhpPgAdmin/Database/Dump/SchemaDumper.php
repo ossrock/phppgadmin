@@ -124,7 +124,19 @@ class SchemaDumper extends AbstractDumper
         $tables = $this->connection->selectSet($sql);
         $dumper = $this->createSubDumper('table');
 
+        // Get list of selected tables (if any)
+        $selectedTables = !empty($options['objects']) ? $options['objects'] : [];
+        $selectedTables = array_combine($selectedTables, $selectedTables);
+
         while ($tables && !$tables->EOF) {
+
+            if (!empty($selectedTables)) {
+                if (!isset($selectedTables[$tables->fields['relname']])) {
+                    $tables->moveNext();
+                    continue;
+                }
+            }
+
             $dumper->dump('table', ['table' => $tables->fields['relname'], 'schema' => $schema], $options);
             $tables->moveNext();
         }

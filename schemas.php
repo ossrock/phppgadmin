@@ -3,6 +3,7 @@
 use PhpPgAdmin\Core\AppContainer;
 use PhpPgAdmin\Database\Actions\RoleActions;
 use PhpPgAdmin\Database\Actions\SchemaActions;
+use PhpPgAdmin\Database\Actions\TableActions;
 use PhpPgAdmin\Gui\ExportFormRenderer;
 use PhpPgAdmin\Gui\ImportFormRenderer;
 
@@ -370,16 +371,28 @@ function doDrop($confirm)
  */
 function doExport($msg = '')
 {
+	$pg = AppContainer::getPostgres();
 	$misc = AppContainer::getMisc();
-	$lang = AppContainer::getLang();
 
 	$misc->printTrail('schema');
 	$misc->printTabs('schema', 'export');
 	$misc->printMsg($msg);
 
+	$tableActions = new TableActions($pg);
+	$tableNames = [];
+	$tables = $tableActions->getTables(false);
+	while (!$tables->EOF) {
+		$tableNames[] = $tables->fields['relname'];
+		$tables->moveNext();
+	}
+
 	// Use the unified ExportFormRenderer for the export form
 	$exportRenderer = new ExportFormRenderer();
-	$exportRenderer->renderExportForm('schema', []);
+	$exportRenderer->renderExportForm('schema', [
+		'name' => 'tables',
+		'icon' => 'Table',
+		'objects' => $tableNames
+	]);
 }
 
 

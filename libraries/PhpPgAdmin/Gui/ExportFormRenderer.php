@@ -26,20 +26,12 @@ class ExportFormRenderer
     /**
      * Render export form for a specific subject
      *
-     * @param string $subject The export subject: 'server', 'database', 'schema', 'table', or 'view'
+     * @param string $subject The export subject: 'server', 'database', 'schema'
      * @param array $params Optional parameters (database, schema, table, view names)
      */
     public function renderExportForm(string $subject, array $params = []): void
     {
         $subject = strtolower(trim($subject));
-
-        // Get list of databases for database selection fieldset (only for server exports)
-        $databases = [];
-        if ($subject === 'server') {
-            $databaseActions = new DatabaseActions($this->pg);
-            $databases = $databaseActions->getDatabases(null, true);
-        }
-        $compressionCaps = CompressionFactory::capabilities();
 
         ?>
         <style>
@@ -109,31 +101,32 @@ class ExportFormRenderer
                     </div>
                 </fieldset>
 
-                <!-- Database Selection -->
-                <fieldset id="database_selection">
-                    <legend><?= $this->lang['strselectdatabasestoexport']; ?></legend>
-                    <p class="small"><?= $this->lang['strunchecktemplatedatabases']; ?></p>
-                    <?php
-                    $databases->moveFirst();
-                    while ($databases && !$databases->EOF) {
-                        $dbName = $databases->fields['datname'];
-                        // Check by default unless it's a template database
-                        $checked = (strpos($dbName, 'template') !== 0) ? 'checked="checked"' : '';
-                        ?>
-                        <div>
-                            <input type="checkbox" id="db_<?= html_esc($dbName); ?>" name="databases[]"
-                                value="<?= html_esc($dbName); ?>" <?= $checked; ?> />
-                            <label for="db_<?= html_esc($dbName); ?>">
-                                <img src="<?= $this->misc->icon('Database') ?>" class="icon">
-                                <?= html_esc($dbName); ?>
-                            </label>
-                        </div>
-                        <?php
-                        $databases->moveNext();
-                    }
-                    ?>
-                </fieldset>
             <?php endif; ?>
+
+            <!-- Object Selection for non-server exports -->
+            <fieldset id="object_selection">
+                <legend>
+                    <?= sprintf(
+                        $this->lang['strselectobjectstoexport'] ?? 'Select %s to export',
+                        ucfirst($params['name'] ?? 'objects')
+                    ); ?>
+                </legend>
+                <?php
+                foreach ($params['objects'] ?? [] as $objName) {
+                    ?>
+                    <div>
+                        <input type="checkbox" id="<?= html_esc($subject . '_' . $objName); ?>" name="objects[]"
+                            value="<?= html_esc($objName); ?>" checked="checked" />
+                        <label for="<?= html_esc($subject . '_' . $objName); ?>">
+                            <img src="<?= $this->misc->icon($params['icon'] ?? ''); ?>" class="icon">
+                            <?= html_esc($objName); ?>
+                        </label>
+                    </div>
+                    <?php
+                }
+                ?>
+            </fieldset>
+
 
             <!-- Structure Export Options -->
             <fieldset id="structure_options">
@@ -236,11 +229,6 @@ class ExportFormRenderer
             <p>
                 <input type="hidden" name="action" value="export" />
                 <input type="hidden" name="subject" value="<?= html_esc($subject); ?>" />
-                <?php foreach ($params as $key => $value): ?>
-                    <?php if (!in_array($key, ['action', 'subject'])): ?>
-                        <input type="hidden" name="<?= html_esc($key); ?>" value="<?= html_esc($value); ?>" />
-                    <?php endif; ?>
-                <?php endforeach; ?>
                 <?= $this->misc->form; ?>
                 <input type="submit" value="<?= $this->lang['strexport']; ?>" />
             </p>
@@ -260,7 +248,7 @@ class ExportFormRenderer
                 const ifNotExists = document.getElementById('if_not_exists');
                 const includeComments = document.getElementById('include_comments');
                 const truncateTables = document.getElementById('truncate_tables');
-                const dbSelection = document.getElementById('database_selection');
+                const objectSelection = document.getElementById('object_selection');
                 const exportRoles = document.getElementById('export_roles');
                 const exportTablespaces = document.getElementById('export_tablespaces');
 
@@ -304,7 +292,7 @@ class ExportFormRenderer
                         // For pg_dumpall: hide structure options and DB selection
                         if (pgdumpallSelected) {
                             structureOptions.style.display = 'none';
-                            if (dbSelection) dbSelection.style.display = 'none';
+                            if (objectSelection) objectSelection.style.display = 'none';
                         } else {
                             // For internal and pg_dump: show structure based on what
                             if (selectedWhat === 'dataonly') {
@@ -312,21 +300,21 @@ class ExportFormRenderer
                             } else {
                                 structureOptions.style.display = 'block';
                             }
-                            if (dbSelection) dbSelection.style.display = 'block';
+                            if (objectSelection) objectSelection.style.display = 'block';
                         }
 
                         // Count selected databases for pg_dump smart logic
-                        const dbCheckboxes = form.querySelectorAll('input[name="databases[]"]');
-                        const checkedCount = Array.from(dbCheckboxes).filter(cb => cb.checked).length;
-                        const totalCount = dbCheckboxes.length;
-                        const allDbsSelected = checkedCount === totalCount && totalCount > 0;
+                        const objectCheckboxes = form.querySelectorAll('input[name="objects[]"]');
+                        const checkedCount = Array.from(objectCheckboxes).filter(cb => cb.checked).length;
+                        const totalCount = objectCheckboxes.length;
+                        const allObjectsSelected = checkedCount === totalCount && totalCount > 0;
 
                         // Control cluster object checkboxes depending on dumper
                         if (exportRoles) {
                             if (pgdumpallSelected) {
                                 exportRoles.checked = true;
                                 exportRoles.disabled = true;
-                            } else if (pgdumpSelected && allDbsSelected) {
+                            } else if (pgdumpSelected && allObjectsSelected) {
                                 // Enable for pg_dump only if all DBs selected
                                 exportRoles.disabled = false;
                             } else if (pgdumpSelected) {
@@ -341,7 +329,7 @@ class ExportFormRenderer
                             if (pgdumpallSelected) {
                                 exportTablespaces.checked = true;
                                 exportTablespaces.disabled = true;
-                            } else if (pgdumpSelected && allDbsSelected) {
+                            } else if (pgdumpSelected && allObjectsSelected) {
                                 // Enable for pg_dump only if all DBs selected
                                 exportTablespaces.disabled = false;
                             } else if (pgdumpSelected) {
@@ -428,8 +416,8 @@ class ExportFormRenderer
                         radio.addEventListener('change', updateWhatRadios);
                     });
                     outputFormatRadios.forEach(radio => radio.addEventListener('change', updateOptions));
-                    const dbCheckboxes = form.querySelectorAll('input[name="databases[]"]');
-                    dbCheckboxes.forEach(cb => cb.addEventListener('change', updateOptions));
+                    const objectCheckboxes = form.querySelectorAll('input[name="objects[]"]');
+                    objectCheckboxes.forEach(cb => cb.addEventListener('change', updateOptions));
                     updateOptions(); // Initial state
                     updateWhatRadios(); // Set initial what radio state
                 }

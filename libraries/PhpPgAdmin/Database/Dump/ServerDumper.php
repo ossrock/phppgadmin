@@ -35,7 +35,8 @@ class ServerDumper extends AbstractDumper
         $databases = $databaseActions->getDatabases();
 
         // Get list of selected databases (if any)
-        $selectedDatabases = !empty($options['databases']) ? $options['databases'] : [];
+        $selectedDatabases = !empty($options['objects']) ? $options['objects'] : [];
+        $selectedDatabases = array_combine($selectedDatabases, $selectedDatabases);
 
         // Build list of databases to dump first so we can detect multi-db mode
         $toDump = [];
@@ -44,7 +45,7 @@ class ServerDumper extends AbstractDumper
 
             // If specific databases are selected, only consider those
             if (!empty($selectedDatabases)) {
-                if (!in_array($dbName, $selectedDatabases)) {
+                if (!isset($selectedDatabases[$dbName])) {
                     $databases->moveNext();
                     continue;
                 }

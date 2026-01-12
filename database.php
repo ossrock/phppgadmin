@@ -1,5 +1,6 @@
 <?php
 
+use PhpPgAdmin\Database\Actions\SchemaActions;
 use PhpPgAdmin\Gui\ExportFormRenderer;
 use PhpPgAdmin\Core\AppContainer;
 use PhpPgAdmin\Gui\ImportFormRenderer;
@@ -336,14 +337,28 @@ function doExport($msg = '')
 {
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$pg = AppContainer::getPostgres();
 
 	$misc->printTrail('database');
 	$misc->printTabs('database', 'export');
 	$misc->printMsg($msg);
 
+	$schemaActions = new SchemaActions($pg);
+	$schemas = $schemaActions->getSchemas();
+	$schemaNames = [];
+	while (!$schemas->EOF) {
+		$schemaNames[] = $schemas->fields['nspname'];
+		;
+		$schemas->moveNext();
+	}
+
 	// Use the unified DumpRenderer for the export form
 	$exportRenderer = new ExportFormRenderer();
-	$exportRenderer->renderExportForm('database', []);
+	$exportRenderer->renderExportForm('database', [
+		'name' => 'schemas',
+		'icon' => 'Schema',
+		'objects' => $schemaNames
+	]);
 }
 
 /**

@@ -81,6 +81,11 @@ class DatabaseDumper extends AbstractDumper
             );
         }
 
+        // Get list of selected schemas (if any)
+        $selectedSchemas = !empty($options['objects']) ? $options['objects'] : [];
+        $selectedSchemas = array_combine($selectedSchemas, $selectedSchemas);
+
+
         // Iterate through schemas
         $schemaActions = new SchemaActions($this->connection);
         $schemas = $schemaActions->getSchemas();
@@ -89,10 +94,17 @@ class DatabaseDumper extends AbstractDumper
         while ($schemas && !$schemas->EOF) {
             $schemaName = $schemas->fields['nspname'];
 
-            // Skip system schemas unless requested
-            if (empty($options['all_schemas']) && ($schemaName === 'information_schema' || strpos($schemaName, 'pg_') === 0)) {
-                $schemas->moveNext();
-                continue;
+            if (!empty($selectedSchemas)) {
+                if (!isset($selectedSchemas[$schemaName])) {
+                    $schemas->moveNext();
+                    continue;
+                }
+            } else {
+                // Skip system schemas unless requested
+                if (empty($options['all_schemas']) && ($schemaName === 'information_schema' || strpos($schemaName, 'pg_') === 0)) {
+                    $schemas->moveNext();
+                    continue;
+                }
             }
 
             $dumper->dump('schema', ['schema' => $schemaName], $options);
