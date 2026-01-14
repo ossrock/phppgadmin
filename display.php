@@ -42,6 +42,12 @@ function doEditRow($confirm, $msg = '')
 	$lang = AppContainer::getLang();
 	$rowActions = new RowActions($pg);
 	$tableActions = new TableActions($pg);
+	$schemaActions = new SchemaActions($pg);
+
+	$schema = $_REQUEST['schema'] ?? $pg->_schema;
+	if (!empty($schema)) {
+		$schemaActions->setSchema($schema);
+	}
 
 	$insert = !isset($_REQUEST['key']);
 	if (!$insert) {
@@ -49,12 +55,102 @@ function doEditRow($confirm, $msg = '')
 			$keyFields = $_REQUEST['key'];
 		else
 			$keyFields = unserialize(urldecode($_REQUEST['key']));
-		$rs = $rowActions->browseRow($_REQUEST['table'], $keyFields);
 	} else {
-		$rs = null;
+		$keyFields = [];
 	}
 
 	$attrs = $tableActions->getTableAttributes($_REQUEST['table']);
+	$byteaColumns = [];
+	if ($attrs && $attrs->recordCount() > 0) {
+		while (!$attrs->EOF) {
+			$type = $attrs->fields['type'] ?? '';
+			if (strpos($type, 'bytea') === 0) {
+				$byteaColumns[] = $attrs->fields['attname'];
+			}
+			$attrs->moveNext();
+		}
+		$attrs->moveFirst();
+	}
+
+	$byteaSizes = [];
+	if (!$insert && !empty($byteaColumns)) {
+		$whereParts = [];
+		foreach ($keyFields as $field => $value) {
+			if ($value === null || (is_string($value) && strcasecmp($value, 'NULL') === 0)) {
+				$whereParts[] = $pg->escapeIdentifier($field) . ' IS NULL';
+			} else {
+				$whereParts[] = $pg->escapeIdentifier($field) . ' = ' . $pg->clean($value);
+			}
+		}
+		$whereClause = implode(' AND ', $whereParts);
+
+		$sizeSelect = [];
+		foreach ($byteaColumns as $col) {
+			$escapedCol = $pg->escapeIdentifier($col);
+			$sizeSelect[] = 'octet_length(' . $escapedCol . ') AS ' . $escapedCol;
+		}
+
+		$sizeSql = 'SELECT ' . implode(', ', $sizeSelect) .
+			' FROM ' . $pg->escapeIdentifier($schema) . '.' . $pg->escapeIdentifier($_REQUEST['table']) .
+			' WHERE ' . $whereClause .
+			' LIMIT 1';
+
+		$sizeResult = $pg->selectSet($sizeSql);
+		if ($sizeResult && $sizeResult->recordCount() === 1) {
+			foreach ($byteaColumns as $col) {
+				$byteaSizes[$col] = $sizeResult->fields[$col];
+			}
+		}
+	}
+
+	$rs = null;
+	if (!$insert) {
+		$byteaInlineLimit = isset($conf['bytea_inline_limit']) ? (int) $conf['bytea_inline_limit'] : 1024 * 1024;
+		if ($byteaInlineLimit < 0) {
+			$byteaInlineLimit = 0;
+		}
+
+		$selectParts = [];
+		if ($attrs && $attrs->recordCount() > 0) {
+			while (!$attrs->EOF) {
+				$col = $attrs->fields['attname'];
+				$type = $attrs->fields['type'] ?? '';
+				if (strpos($type, 'bytea') === 0) {
+					$size = $byteaSizes[$col] ?? null;
+					if ($size !== null && $byteaInlineLimit > 0 && $size > $byteaInlineLimit) {
+						$selectParts[] = 'NULL AS ' . $pg->escapeIdentifier($col);
+					} else {
+						$selectParts[] = $pg->escapeIdentifier($col);
+					}
+				} else {
+					$selectParts[] = $pg->escapeIdentifier($col);
+				}
+				$attrs->moveNext();
+			}
+			$attrs->moveFirst();
+		}
+
+		if (!empty($selectParts)) {
+			$whereParts = [];
+			foreach ($keyFields as $field => $value) {
+				if ($value === null || (is_string($value) && strcasecmp($value, 'NULL') === 0)) {
+					$whereParts[] = $pg->escapeIdentifier($field) . ' IS NULL';
+				} else {
+					$whereParts[] = $pg->escapeIdentifier($field) . ' = ' . $pg->clean($value);
+				}
+			}
+			$whereClause = implode(' AND ', $whereParts);
+			$rowSql = 'SELECT ' . implode(', ', $selectParts) .
+				' FROM ' . $pg->escapeIdentifier($schema) . '.' . $pg->escapeIdentifier($_REQUEST['table']) .
+				' WHERE ' . $whereClause .
+				' LIMIT 1';
+			$rs = $pg->selectSet($rowSql);
+		}
+
+		if (!$rs) {
+			$rs = $rowActions->browseRow($_REQUEST['table'], $keyFields);
+		}
+	}
 
 	if (isset($_REQUEST['edit-inline'])) {
 		// edit field inline
@@ -113,10 +209,37 @@ EOT;
 		// make function searchable by key
 		$all_functions = array_combine($all_functions, $all_functions);
 
+		$byteaInlineLimit = isset($conf['bytea_inline_limit']) ? (int) $conf['bytea_inline_limit'] : 1024 * 1024;
+		if ($byteaInlineLimit < 0) {
+			$byteaInlineLimit = 0;
+		}
+
+		$parseSize = function ($value) {
+			$unit = strtoupper(substr(trim($value), -1));
+			$number = (int) $value;
+			switch ($unit) {
+				case 'G':
+					return $number * 1024 * 1024 * 1024;
+				case 'M':
+					return $number * 1024 * 1024;
+				case 'K':
+					return $number * 1024;
+				default:
+					return (int) $value;
+			}
+		};
+
+		$byteaMaxUploadSize = isset($conf['bytea_max_upload_size']) ? (int) $conf['bytea_max_upload_size'] : 0;
+		if ($byteaMaxUploadSize <= 0) {
+			$uploadMax = $parseSize(ini_get('upload_max_filesize'));
+			$postMax = $parseSize(ini_get('post_max_size'));
+			$byteaMaxUploadSize = min($uploadMax, $postMax);
+		}
+
 		echo "<form action=\"display.php\" method=\"post\" id=\"ac_form\" enctype=\"multipart/form-data\">\n";
 		$error = true;
 		if ($attrs->recordCount() > 0 && ($insert || $rs->recordCount() == 1)) {
-			echo "<table>\n";
+			echo "<table class=\"data\">\n";
 
 			// Output table header
 			echo "<tr>\n";
@@ -225,11 +348,38 @@ EOT;
 					$extras['data-attnum'] = $attrs->fields['attnum'];
 				}
 
+				$type = $attrs->fields['type'] ?? '';
+				$options = null;
+				if (strpos($type, 'bytea') === 0) {
+					$downloadUrl = null;
+					if (!$insert && !empty($keyFields)) {
+						$params = [
+							'action' => 'downloadbytea',
+							'server' => $_REQUEST['server'],
+							'database' => $_REQUEST['database'],
+							'schema' => $schema,
+							'table' => $_REQUEST['table'],
+							'column' => $attrs->fields['attname'],
+							'key' => $keyFields,
+							'output' => 'download', // for frameset.js to detect
+						];
+						$downloadUrl = 'display.php?' . http_build_query($params);
+					}
+					$options = [
+						'is_insert' => $insert,
+						'size' => $byteaSizes[$attrs->fields['attname']] ?? null,
+						'limit' => $byteaInlineLimit,
+						'download_url' => $downloadUrl,
+						'max_upload_size' => $byteaMaxUploadSize,
+					];
+				}
+
 				$formRenderer->printField(
 					"values[{$attrs->fields['attname']}]",
 					$value,
 					$attrs->fields['type'],
-					$extras
+					$extras,
+					$options
 				);
 
 				echo "</td>";
@@ -318,6 +468,54 @@ EOT;
 			$fields[$attrs->fields['attnum']] = $attrs->fields['attname'];
 			$types[$attrs->fields['attname']] = $attrs->fields['type'];
 			$attrs->moveNext();
+		}
+
+		$byteaColumns = [];
+		foreach ($types as $field => $type) {
+			if (strpos($type, 'bytea') === 0) {
+				$byteaColumns[] = $field;
+			}
+		}
+
+		$byteaUploads = $_FILES['bytea_upload'] ?? [];
+		if (!is_array($byteaUploads)) {
+			$byteaUploads = [];
+		}
+		if (!empty($byteaColumns) && !empty($byteaUploads)) {
+			foreach ($byteaColumns as $field) {
+				$uploadError = $byteaUploads['error'][$field] ?? UPLOAD_ERR_NO_FILE;
+				if ($uploadError === UPLOAD_ERR_OK) {
+					$tmpName = $byteaUploads['tmp_name'][$field] ?? '';
+					if ($tmpName && is_uploaded_file($tmpName)) {
+						$data = file_get_contents($tmpName);
+						if ($data !== false) {
+							$hex = bin2hex($data);
+							$_POST['values'][$field] = "decode('{$hex}','hex')";
+							$_POST['expr'][$field] = 1;
+							unset($_POST['nulls'][$field]);
+						}
+					}
+				}
+			}
+		}
+
+		if (!$insert && !empty($_POST['bytea_keep']) && is_array($_POST['bytea_keep'])) {
+			foreach ($_POST['bytea_keep'] as $field => $keep) {
+				if (!in_array($field, $byteaColumns, true)) {
+					continue;
+				}
+				if (isset($_POST['nulls'][$field])) {
+					continue;
+				}
+				$uploadError = $byteaUploads['error'][$field] ?? UPLOAD_ERR_NO_FILE;
+				$hasUpload = ($uploadError === UPLOAD_ERR_OK);
+				$hasValue = isset($_POST['values'][$field]) && $_POST['values'][$field] !== '';
+				if (!$hasUpload && !$hasValue) {
+					$_POST['expr'][$field] = 1;
+					$_POST['values'][$field] = $pg->escapeIdentifier($field);
+					unset($_POST['nulls'][$field]);
+				}
+			}
 		}
 
 		if ($insert) {
@@ -506,37 +704,119 @@ function doDownloadBytea()
 	}
 	$whereClause = implode(' AND ', $whereParts);
 
-	// Query to fetch the bytea data
-	$sql = 'SELECT ' . $pg->escapeIdentifier($column) .
+	$sanitizePart = function ($value) {
+		return preg_replace('/[^a-zA-Z0-9_-]+/', '', (string) $value);
+	};
+	$timestamp = date('Ymd_His');
+	$keyParts = [];
+	foreach ($keyFields as $field => $value) {
+		$keyParts[] = $sanitizePart($field . '_' . ($value === null ? 'null' : $value));
+	}
+	$filenameParts = [
+		$sanitizePart($table),
+		$sanitizePart($column),
+	];
+	if (!empty($keyParts)) {
+		$filenameParts[] = implode('-', $keyParts);
+	}
+	$filenameParts[] = $timestamp;
+	$filename = implode('-', array_filter($filenameParts)) . '.dat';
+
+	$sizeSql = 'SELECT octet_length(' . $pg->escapeIdentifier($column) . ') AS size' .
 		' FROM ' . $pg->escapeIdentifier($schema) . '.' . $pg->escapeIdentifier($table) .
 		' WHERE ' . $whereClause .
 		' LIMIT 1';
+	$sizeResult = $pg->selectSet($sizeSql);
+	if (!$sizeResult || $sizeResult->recordCount() !== 1) {
+		header('HTTP/1.0 404 Not Found');
+		echo 'Data not found';
+		exit;
+	}
+	$totalSize = $sizeResult->fields['size'];
+	if ($totalSize === null) {
+		header('HTTP/1.0 404 Not Found');
+		echo 'Data is NULL';
+		exit;
+	}
+	$totalSize = (int) $totalSize;
 
+	$range = $_SERVER['HTTP_RANGE'] ?? '';
+	if ($range && preg_match('/bytes=(\d+)-(\d*)/i', $range, $matches)) {
+		$start = (int) $matches[1];
+		$end = ($matches[2] !== '') ? (int) $matches[2] : ($totalSize - 1);
+		if ($start >= $totalSize || $start < 0) {
+			header('HTTP/1.1 416 Range Not Satisfiable');
+			header('Content-Range: bytes */' . $totalSize);
+			exit;
+		}
+		if ($end >= $totalSize) {
+			$end = $totalSize - 1;
+		}
+		if ($end < $start) {
+			header('HTTP/1.1 416 Range Not Satisfiable');
+			header('Content-Range: bytes */' . $totalSize);
+			exit;
+		}
+
+		$length = $end - $start + 1;
+		$offset = $start + 1;
+		$chunkSql = 'SELECT substring(' . $pg->escapeIdentifier($column) . ' FROM ' . $offset . ' FOR ' . $length . ') AS chunk' .
+			' FROM ' . $pg->escapeIdentifier($schema) . '.' . $pg->escapeIdentifier($table) .
+			' WHERE ' . $whereClause .
+			' LIMIT 1';
+		$chunkResult = $pg->selectSet($chunkSql);
+		if (!$chunkResult || $chunkResult->recordCount() !== 1) {
+			header('HTTP/1.0 404 Not Found');
+			echo 'Data not found';
+			exit;
+		}
+		$chunk = $chunkResult->fields['chunk'];
+		if ($chunk === null) {
+			header('HTTP/1.0 404 Not Found');
+			echo 'Data is NULL';
+			exit;
+		}
+
+		header('HTTP/1.1 206 Partial Content');
+		header('Content-Type: application/octet-stream');
+		header('Content-Disposition: attachment; filename="' . $filename . '"');
+		header('Accept-Ranges: bytes');
+		header('Content-Range: bytes ' . $start . '-' . $end . '/' . $totalSize);
+		header('Content-Length: ' . $length);
+		header('Cache-Control: must-revalidate');
+		header('Pragma: public');
+
+		echo $chunk;
+		exit;
+	}
+
+	$sql = 'SELECT ' . $pg->escapeIdentifier($column) . ' AS data' .
+		' FROM ' . $pg->escapeIdentifier($schema) . '.' . $pg->escapeIdentifier($table) .
+		' WHERE ' . $whereClause .
+		' LIMIT 1';
 	$result = $pg->selectSet($sql);
-
 	if ($result && $result->recordCount() === 1) {
-		$data = $result->fields[$column];
-
+		$data = $result->fields['data'];
 		if ($data === null) {
 			header('HTTP/1.0 404 Not Found');
 			echo 'Data is NULL';
 			exit;
 		}
 
-		// Send binary data
 		header('Content-Type: application/octet-stream');
-		header('Content-Disposition: attachment; filename="' . $table . '_' . $column . '.bin"');
-		header('Content-Length: ' . strlen($data));
+		header('Content-Disposition: attachment; filename="' . $filename . '"');
+		header('Accept-Ranges: bytes');
+		header('Content-Length: ' . ($totalSize > 0 ? $totalSize : strlen($data)));
 		header('Cache-Control: must-revalidate');
 		header('Pragma: public');
 
 		echo $data;
 		exit;
-	} else {
-		header('HTTP/1.0 404 Not Found');
-		echo 'Data not found';
-		exit;
 	}
+
+	header('HTTP/1.0 404 Not Found');
+	echo 'Data not found';
+	exit;
 }
 
 

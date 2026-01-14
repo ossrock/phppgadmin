@@ -48,9 +48,9 @@ class FormRenderer extends AbstractContext
 	 * @param string $type The database type of the field
 	 * @param array $extras An array of attributes name as key and attributes' values as value
 	 */
-	function printField($name, $value, $type, $extras = [])
+	function printField($name, $value, $type, $extras = [], $options = null)
 	{
-		global $lang;
+		$lang = $this->lang();
 
 		if (!isset($value)) {
 			$value = '';
@@ -110,9 +110,48 @@ class FormRenderer extends AbstractContext
 				break;
 			case 'bytea':
 			case 'bytea[]':
-				if (!is_null($value)) {
-					$value = '\x' . strtoupper(bin2hex($value));
+				$byteaLimit = $options['limit'] ?? 0;
+				$byteaSize = $options['size'] ?? null;
+				$isInsert = !empty($options['is_insert']);
+				$downloadUrl = $options['download_url'] ?? null;
+				$maxUploadSize = $options['max_upload_size'] ?? 0;
+				$showTextarea = !($byteaLimit > 0 && $byteaSize > $byteaLimit);
+
+				if ($showTextarea) {
+					if (!is_null($value)) {
+						$value = '\\x' . strtoupper(bin2hex($value));
+					}
+					$n = substr_count($value ?? '', "\n");
+					$n = $n < 5 ? 5 : $n;
+					$n = $n > 20 ? 20 : $n;
+					echo "<textarea name=\"", htmlspecialchars($name), "\" rows=\"{$n}\" cols=\"75\"{$extra_str}>\n";
+					echo htmlspecialchars($value ?? '');
+					echo "</textarea>\n";
+				} else {
+					echo "<input type=\"hidden\" name=\"", htmlspecialchars($name), "\" value=\"\" />\n";
 				}
+
+				$fieldKey = $name;
+				if (preg_match('/^values\[(.+)\]$/', $name, $matches)) {
+					$fieldKey = $matches[1];
+				}
+				$fileInputName = 'bytea_upload[' . $fieldKey . ']';
+				$fileExtra = '';
+				if ($maxUploadSize > 0) {
+					$fileExtra .= ' data-max-size="' . htmlspecialchars((string) $maxUploadSize) . '"';
+				}
+				echo "<div class=\"bytea-upload\">";
+				echo "<input type=\"file\" name=\"", htmlspecialchars($fileInputName), "\"{$fileExtra} />";
+				if (!$isInsert && $downloadUrl && $byteaSize > 0) {
+					echo "<div class=\"flex-row\">";
+					echo "<div class=\"ml-auto\"></div>";
+					echo "<div class=\"me-1\"><a href=\"$downloadUrl\">", htmlspecialchars($lang['strdownload']), "</a></div>";
+					echo $this->misc()->printVal($byteaSize, 'prettysize');
+					echo "<input type=\"hidden\" name=\"bytea_keep[", htmlspecialchars($fieldKey), "]\" value=\"1\" />";
+					echo "</div>";
+				}
+				echo "</div>\n";
+				break;
 			case 'text':
 			case 'text[]':
 			case 'json':

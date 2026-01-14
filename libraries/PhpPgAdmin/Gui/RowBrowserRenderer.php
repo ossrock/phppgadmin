@@ -255,6 +255,7 @@ class RowBrowserRenderer extends AbstractContext
                             'table' => $table,
                             'column' => $column,
                             'key' => $keyValues,
+                            'output' => 'download', // for frameset.js to detect
                         ];
                         $url = 'display.php?' . http_build_query($params);
                         echo ' <a class="ui-btn" href="' . $url . '">' . htmlspecialchars($lang['strdownload']) . '</a>';
