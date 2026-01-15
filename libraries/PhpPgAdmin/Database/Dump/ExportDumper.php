@@ -72,6 +72,11 @@ abstract class ExportDumper extends AbstractContext
      */
     protected function writeHeader($title)
     {
+        static $headerWritten = false;
+        if ($headerWritten) {
+            return;
+        }
+        $headerWritten = true;
         $name = AppContainer::getAppName();
         $version = AppContainer::getAppVersion();
         $this->write("--\n");

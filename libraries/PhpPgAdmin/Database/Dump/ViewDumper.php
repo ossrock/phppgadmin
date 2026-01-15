@@ -40,6 +40,8 @@ class ViewDumper extends ExportDumper
         $oid = $rs->fields['oid'];
         $def = $rs->fields['vwdefinition'];
 
+        $this->write("\n-- View: \"" . addslashes($c_schema) . "\".\"" . addslashes($c_view) . "\"\n");
+
         $this->writeDrop('VIEW', "\"" . addslashes($c_schema) . "\".\"" . addslashes($c_view), $options);
 
         // pg_get_viewdef returns just the SELECT part, we need to wrap it

@@ -120,6 +120,8 @@ class SchemaDumper extends ExportDumper
         $typeDumper = $this->createSubDumper('type');
         $domainDumper = $this->createSubDumper('domain');
 
+        $this->write("\n-- Types and Domains in schema \"" . addslashes($schema) . "\"\n");
+
         foreach ($sortedOids as $oid) {
             $t = $typeList[$oid];
 
@@ -215,97 +217,28 @@ class SchemaDumper extends ExportDumper
 
     protected function dumpSequences($schema, $options)
     {
+        $this->write("\n-- Sequences in schema \"" . addslashes($schema) . "\"\n");
         $this->dumpRelkindObjects($schema, $options, 'S', 'sequence');
     }
 
     protected function dumpTables($schema, $options)
     {
+        $this->write("\n-- Tables in schema \"" . addslashes($schema) . "\"\n");
         $this->dumpRelkindObjects($schema, $options, 'r', 'table');
     }
 
     protected function dumpViews($schema, $options)
     {
+        $this->write("\n-- Views in schema \"" . addslashes($schema) . "\"\n");
         $this->dumpRelkindObjects($schema, $options, 'v', 'view');
     }
-
-    /*
-    protected function dumpSequences($schema, $options)
-    {
-        $c_schema = $schema;
-        $this->connection->clean($c_schema);
-
-        $sql = "SELECT c.relname AS seqname
-                FROM pg_catalog.pg_class c
-                JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-                WHERE c.relkind = 'S'
-                AND n.nspname = '{$c_schema}'
-                ORDER BY c.relname";
-
-        $sequences = $this->connection->selectSet($sql);
-        $dumper = $this->createSubDumper('sequence');
-
-        while ($sequences && !$sequences->EOF) {
-            $seqName = $sequences->fields['seqname'];
-            if (!$this->hasObjectSelection || isset($this->selectedObjects[$seqName])) {
-                $dumper->dump('sequence', ['sequence' => $seqName, 'schema' => $schema], $options);
-            }
-            $sequences->moveNext();
-        }
-    }
-
-    protected function dumpTables($schema, $options)
-    {
-        $c_schema = $schema;
-        $this->connection->clean($c_schema);
-
-        $sql = "SELECT c.relname
-                FROM pg_catalog.pg_class c
-                LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-                WHERE c.relkind = 'r'
-                AND n.nspname = '{$c_schema}'
-                ORDER BY c.relname";
-
-        $tables = $this->connection->selectSet($sql);
-        $dumper = $this->createSubDumper('table');
-
-        while ($tables && !$tables->EOF) {
-            $tableName = $tables->fields['relname'];
-            if (!$this->hasObjectSelection || isset($this->selectedObjects[$tableName])) {
-                $dumper->dump('table', ['table' => $tableName, 'schema' => $schema], $options);
-            }
-            $tables->moveNext();
-        }
-    }
-
-    protected function dumpViews($schema, $options)
-    {
-        $c_schema = $schema;
-        $this->connection->clean($c_schema);
-
-        $sql = "SELECT c.relname
-                FROM pg_catalog.pg_class c
-                LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-                WHERE c.relkind = 'v'
-                AND n.nspname = '{$c_schema}'
-                ORDER BY c.relname";
-
-        $views = $this->connection->selectSet($sql);
-        $dumper = $this->createSubDumper('view');
-
-        while ($views && !$views->EOF) {
-            $viewName = $views->fields['relname'];
-            if (!$this->hasObjectSelection || isset($this->selectedObjects[$viewName])) {
-                $dumper->dump('view', ['view' => $viewName, 'schema' => $schema], $options);
-            }
-            $views->moveNext();
-        }
-    }
-    */
 
     protected function dumpFunctions($schema, $options)
     {
         $c_schema = $schema;
         $this->connection->clean($c_schema);
+
+        $this->write("\n-- Functions in schema \"" . addslashes($c_schema) . "\"\n");
 
         $sql = "SELECT p.oid AS prooid
                 FROM pg_catalog.pg_proc p

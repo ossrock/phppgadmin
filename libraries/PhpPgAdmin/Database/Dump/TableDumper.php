@@ -24,7 +24,7 @@ class TableDumper extends ExportDumper
             return;
         }
 
-        $this->write("\n-- Table: \"{$schema}\".\"{$table}\"\n");
+        $this->write("\n-- Table: \"{$schema}\".\"{$table}\"\n\n");
 
         if (empty($options['data_only'])) {
             $this->dumpStructure($table, $schema, $options);
@@ -167,15 +167,6 @@ class TableDumper extends ExportDumper
     }
 
     /**
-     * Returns SQL for changing current user.
-     */
-    private function getChangeUserSQL($user)
-    {
-        $this->connection->clean($user);
-        return "SET SESSION AUTHORIZATION '{$user}';";
-    }
-
-    /**
      * Get table definition prefix. Must be run within a transaction.
      */
     public function getTableDefPrefix($table, $clean = false)
@@ -201,7 +192,12 @@ class TableDumper extends ExportDumper
             return null;
         }
 
-        $sql = $this->getChangeUserSQL($t->fields['relowner']) . "\n\n";
+        $sql = "";
+        if (false) {
+            // TODO : implement changing user if needed
+            $owner = $this->connection->clean($t->fields['relowner']);
+            $sql .= "SET SESSION AUTHORIZATION '{$owner}';\n\n";
+        }
         $sql .= "SET search_path = \"{$t->fields['nspname']}\", pg_catalog;\n\n";
         $sql .= "-- Definition\n\n";
         if (!$clean)

@@ -21,6 +21,8 @@ class DatabaseDumper extends ExportDumper
         $c_database = $database;
         $this->connection->clean($c_database);
 
+        $this->writeHeader("Database: \"{$c_database}\"");
+
         // Emit global preliminaries (ON_ERROR_STOP) unless suppressed
         if (empty($options['suppress_preliminaries'])) {
             $this->write("\\set ON_ERROR_STOP on\n\n");
@@ -123,7 +125,7 @@ class DatabaseDumper extends ExportDumper
         }
 
         // After dumping this database, reset session_replication_role to origin
-        $this->write("SET session_replication_role = 'origin';\n\n");
+        $this->write("\nSET session_replication_role = 'origin';\n\n");
 
     }
 }
