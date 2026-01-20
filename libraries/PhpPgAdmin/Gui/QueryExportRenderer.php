@@ -158,6 +158,7 @@ class QueryExportRenderer
             </fieldset>
 
             <p>
+                <input type="hidden" name="action" value="export" />
                 <input type="hidden" name="query" value="<?= html_esc($query); ?>" />
                 <?php foreach ($params as $key => $value): ?>
                     <?php if (!in_array($key, ['action', 'query'])): ?>

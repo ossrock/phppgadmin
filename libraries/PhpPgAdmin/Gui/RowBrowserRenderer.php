@@ -327,7 +327,6 @@ class RowBrowserRenderer extends AppContext
      */
     function doBrowse($msg = '')
     {
-
         $pg = AppContainer::getPostgres();
         $conf = AppContainer::getConf();
         $misc = AppContainer::getMisc();
@@ -339,129 +338,29 @@ class RowBrowserRenderer extends AppContext
 
         $save_history = !isset($_REQUEST['nohistory']);
 
-        if (!isset($_REQUEST['schema']))
-            $_REQUEST['schema'] = $pg->_schema;
-
-        // This code is used when browsing FK in pure HTML (without js)
-        if (isset($_REQUEST['fkey'])) {
-            $ops = [];
-            foreach ($_REQUEST['fkey'] as $x => $y) {
-                $ops[$x] = '=';
-            }
-            $query = $pg->getSelectSQL($_REQUEST['table'], [], $_REQUEST['fkey'], $ops);
-            $_REQUEST['query'] = $query;
-        }
-
-        // Set the schema search path
-        if (isset($_REQUEST['search_path'])) {
-            if (
-                $schemaActions->setSearchPath(
-                    array_map('trim', explode(',', $_REQUEST['search_path']))
-                ) != 0
-            ) {
-                return;
-            }
-        }
-
-        // read table/view name from url parameters
-        $subject = $_REQUEST['subject'] ?? '';
-        $table_name = $_REQUEST['table'] ?? $_REQUEST['view'] ?? null;
-
-        if (!empty($_REQUEST['query']) && !isSqlReadQuery($_REQUEST['query'])) {
-            // process non-SELECT query separately
-            $this->executeNonUpdateQuery($_REQUEST['query']);
-            // restore last read query from session
-            $_REQUEST['query'] = $_SESSION['sqlquery'] ?? '';
-        }
-
-        if (isset($table_name)) {
-            if (isset($_REQUEST['query'])) {
-                //$misc->printTitle($lang['strselect']);
-                $type = 'SELECT';
-            } else {
-                $type = 'TABLE';
-            }
-        } else {
-            if (empty($_REQUEST['query'])) {
-                // if we come from sql.php or the query is too large to be passed
-                // via GET parameters, retrieve it from the session
-                $_REQUEST['query'] = $_SESSION['sqlquery'] ?? '';
-            }
-            //$misc->printTitle($lang['strqueryresults']);
-            $type = 'QUERY';
-        }
-
-        // Get or build SQL query
-        if (!empty($_REQUEST['query'])) {
-            $query = $_REQUEST['query'];
-            $parse_table = true;
-        } else {
-            $parse_table = false;
-            $query = "SELECT * FROM " . $pg->escapeIdentifier($_REQUEST['schema']);
-            if ($_REQUEST['subject'] == 'view') {
-                $query .= "." . $pg->escapeIdentifier($_REQUEST['view']) . ";";
-            } else {
-                $query .= "." . $pg->escapeIdentifier($_REQUEST['table']) . ";";
-            }
-        }
-
-        // Parse SQL query
         $parser = new PHPSQLParser();
-        $parsed = $parser->parse($query);
-
-        //$pg->conn->debug = true;
-        //var_dump($parsed);
-
-        // update table/view name in url parameters
-        if ($parse_table) {
-            if (!empty($parsed['SELECT']) && ($parsed['FROM'][0]['expr_type'] ?? '') == 'table') {
-                $parts = $parsed['FROM'][0]['no_quotes']['parts'] ?? [];
-                $changed = false;
-                //var_dump($parts);
-                if (count($parts) === 2) {
-                    [$schema, $table] = $parts;
-                    $changed = $_REQUEST['schema'] != $schema || $table_name != $table;
-                    //var_dump($_REQUEST['schema'], $table_name);
-                } else {
-                    [$table] = $parts;
-                    $schema = $_REQUEST['schema'] ?? $pg->_schema;
-                    if (empty($schema)) {
-                        $schema = $tableActions->findTableSchema($table) ?? '';
-                        if (!empty($schema)) {
-                            $misc->setCurrentSchema($schema);
-                        }
-                        //var_dump($schema);
-                    }
-                    $changed = $table_name != $table && !empty($schema);
-                }
-                if ($changed) {
-                    //var_dump($schema, $table);
-                    $misc->setCurrentSchema($schema);
-                    $table_name = $table;
-                    unset($_REQUEST[$subject]);
-                    $subject = $tableActions->getTableType($schema, $table) ?? '';
-                    //var_dump($subject);
-                    if (!empty($subject)) {
-                        $_REQUEST['subject'] = $subject;
-                        $_REQUEST[$subject] = $table;
-                    }
-                }
-            }
+        if (
+            !$this->prepareBrowseRequest(
+                $pg,
+                $conf,
+                $tableActions,
+                $rowActions,
+                $schemaActions,
+                $parser,
+                $subject,
+                $table_name,
+                $type,
+                $query,
+                $parsed,
+                $key_fields_early
+            )
+        ) {
+            return;
         }
 
-        // Fetch unique row identifier early (needed for bytea optimization)
-        $key_fields_early = [];
-        if (isset($table_name)) {
-            $key_fields_early = $rowActions->getRowIdentifier($table_name);
-        }
-
-        // Change type to handle primary key information
-        // Disable numeric fields and duplicate field names for now
         if ($type == 'QUERY' && !empty($table) && !empty($schema)) {
             $type = 'SELECT';
         }
-
-        //$this->beginHtml();
 
         $misc->printTrail($subject ?? 'database');
         $misc->printTabs($subject, 'browse');
@@ -472,21 +371,15 @@ class RowBrowserRenderer extends AppContext
         if (!isset($_REQUEST['page']))
             $_REQUEST['page'] = 1;
 
-        $orderbyClearRequested = !empty($_REQUEST['orderby_clear']);
-
-        // If 'orderby' is not set, default to []
         if (!isset($_REQUEST['orderby']))
             $_REQUEST['orderby'] = [];
 
-        // If 'strings' is not set, default to collapsed
         if (!isset($_REQUEST['strings']))
             $_REQUEST['strings'] = 'collapsed';
 
-        // Default max_rows to $conf['max_rows'] if not set
         if (!isset($_REQUEST['max_rows']))
             $_REQUEST['max_rows'] = $conf['max_rows'];
 
-        // Use key fields from early fetch (for bytea optimization) or fetch now
         if (!empty($key_fields_early)) {
             $key_fields = $key_fields_early;
         } elseif (isset($table_name)) {
@@ -495,185 +388,12 @@ class RowBrowserRenderer extends AppContext
             $key_fields = [];
         }
 
-        $orderBySet = false;
-        $orderbyIsNonEmpty = is_array($_REQUEST['orderby']) && !empty($_REQUEST['orderby']);
-        if ($orderbyClearRequested) {
-            $_REQUEST['orderby'] = [];
-            $orderbyIsNonEmpty = false;
-        }
+        $this->applyOrderByFromRequest($query, $parsed, $orderBySet);
 
-        if ($orderbyIsNonEmpty || $orderbyClearRequested) {
-            // Header links / client-side sorting: update ORDER BY in the SQL query.
-            if (!empty($parsed['SELECT'])) {
-                $newOrderBy = '';
-                if ($orderbyIsNonEmpty) {
-                    $newOrderBy = 'ORDER BY ';
-                    $sep = "";
-                    foreach ($_REQUEST['orderby'] as $field => $dir) {
-                        $dir = strcasecmp($dir, 'desc') === 0 ? 'DESC' : 'ASC';
-                        $newOrderBy .= $sep . pg_escape_id($field) . ' ' . $dir;
-                        $sep = ", ";
-                    }
-                }
+        [$displayQuery, $execQuery] = $this->prepareExecQuery($query, $parser, $rowActions, $pg);
 
-                if (!empty($parsed['ORDER'])) {
-                    $pattern = '/\s*ORDER\s+BY[\s\S]*?(?=\sLIMIT|\sOFFSET|\sFETCH|\sFOR|\sUNION|\sINTERSECT|\sEXCEPT|\)|--|\/\*|;|\s*$)/i';
-                    preg_match_all($pattern, $query, $matches);
-
-                    if (!empty($matches[0])) {
-                        $lastOrderBy = end($matches[0]);
-                        $query = str_replace($lastOrderBy, $newOrderBy === '' ? '' : ' ' . $newOrderBy, $query);
-                        $orderBySet = true;
-                    }
-                } elseif ($newOrderBy !== '') {
-                    $query = rtrim($query, " \t\n\r\0\x0B;");
-
-                    $pattern = '/\s*(?:'
-                        . '(?:LIMIT|OFFSET|FETCH|FOR|UNION|INTERSECT|EXCEPT)\b[^;]*'
-                        . '|'
-                        . '\)'
-                        . '|'
-                        . '--[^\r\n]*'
-                        . '|'
-                        . '\/\*.*?\*\/'
-                        . ')\s*$/is';
-
-                    if (preg_match($pattern, $query, $matches, PREG_OFFSET_CAPTURE)) {
-                        $endPos = $matches[0][1];
-                        $query = substr($query, 0, $endPos) . ' ' . $newOrderBy . substr($query, $endPos);
-                    } else {
-                        $query .= ' ' . $newOrderBy;
-                    }
-
-                    $query .= ';';
-                    $orderBySet = true;
-                }
-            }
-        } else {
-            // No explicit orderby params: sync the arrows from ORDER BY inside the query.
-            if (!empty($parsed['ORDER'])) {
-                $_REQUEST['orderby'] = [];
-                foreach ($parsed['ORDER'] as $orderExpr) {
-                    $field = trim($orderExpr['base_expr'], " \t\n\r\0\x0B;");
-                    if (preg_match('/^"(?:[^"]|"")*"$/', $field)) {
-                        $field = str_replace('""', '"', substr($field, 1, -1));
-                    } elseif (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $field)) {
-                        continue;
-                    }
-                    $dir = strtolower($orderExpr['direction'] ?? '');
-                    if ($dir !== 'desc') {
-                        $dir = 'asc';
-                    }
-                    $_REQUEST['orderby'][$field] = $dir;
-                }
-                $orderBySet = true;
-            }
-        }
-
-        // Preserve the user-visible query (ORDER BY changes apply here).
-        $displayQuery = $query;
-        $execQuery = $displayQuery;
-
-        // Bytea avoidance: try AST-based rewrite first (supports multi-table joins when keys are available).
-        $execParsed = $parser->parse($execQuery);
-        if (!empty($execParsed['SELECT']) && !empty($execParsed['FROM']) && is_array($execParsed['FROM'])) {
-            $keyFieldsByAlias = [];
-            $schemaActionsForKeys = new SchemaActions($pg);
-            foreach ($execParsed['FROM'] as $from) {
-                if (($from['expr_type'] ?? '') !== 'table') {
-                    $keyFieldsByAlias = [];
-                    break;
-                }
-                $parts = $from['no_quotes']['parts'] ?? [];
-                if (empty($parts)) {
-                    continue;
-                }
-                if (count($parts) === 2) {
-                    $schemaName = $parts[0];
-                    $tableName = $parts[1];
-                } elseif (count($parts) === 1) {
-                    $schemaName = $_REQUEST['schema'] ?? $pg->_schema;
-                    $tableName = $parts[0];
-                } else {
-                    continue;
-                }
-                $alias = $from['alias']['name'] ?? $tableName;
-                if (empty($alias) || empty($tableName)) {
-                    continue;
-                }
-
-                $schemaActionsForKeys->setSchema($schemaName);
-                $keys = $rowActions->getRowIdentifier($tableName);
-                if (is_array($keys) && !empty($keys)) {
-                    $keyFieldsByAlias[$alias] = $keys;
-                }
-            }
-
-            if (!empty($keyFieldsByAlias)) {
-                $byteaModifier = new ByteaQueryModifier();
-                $modifierResult = $byteaModifier->modifyQuery($execParsed, $execQuery, $keyFieldsByAlias);
-                $execQuery = $modifierResult['query'];
-
-                if (!empty($modifierResult['bytea_columns'])) {
-                    $execHash = md5($execQuery);
-                    if (!isset($_SESSION['bytea_columns'])) {
-                        $_SESSION['bytea_columns'] = [];
-                    }
-                    $_SESSION['bytea_columns'][$execHash] = $modifierResult['bytea_columns'];
-                    $_SESSION['bytea_query_hash'] = $execHash;
-                }
-            }
-        }
-
-        // Fallback: probe result metadata (0 rows) to detect bytea output columns.
-        // This sends a second statement to PostgreSQL, but should not execute table scans.
-        $normalizedForProbe = preg_replace('/^(\s*--.*\n|\s*\/\*.*?\*\/)*/s', '', $execQuery);
-        $normalizedForProbe = ltrim($normalizedForProbe);
-        $isSelectOrWith = preg_match('/^(SELECT|WITH)\b/i', $normalizedForProbe);
-        if ($isSelectOrWith) {
-            $currentHash = md5($execQuery);
-            $alreadyHasMeta = !empty($_SESSION['bytea_columns'][$currentHash] ?? null);
-            if (!$alreadyHasMeta) {
-                $probe = new QueryResultMetadataProbe();
-                $probeResult = $probe->probeResultFields($execQuery);
-                if (!empty($probeResult['fields']) && empty($probeResult['has_duplicate_names'])) {
-                    $hasBytea = false;
-                    foreach ($probeResult['fields'] as $f) {
-                        if (!empty($f['is_bytea'])) {
-                            $hasBytea = true;
-                            break;
-                        }
-                    }
-                    if ($hasBytea) {
-                        $execQuery = $probe->rewriteQueryReplaceByteaWithLength($execQuery, $probeResult['fields']);
-                        $probeMeta = [];
-                        foreach ($probeResult['fields'] as $f) {
-                            if (!empty($f['is_bytea'])) {
-                                $probeMeta[$f['name']] = [
-                                    'schema' => null,
-                                    'table' => null,
-                                    'column' => $f['name'],
-                                    'key_fields' => [],
-                                ];
-                            }
-                        }
-                        if (!empty($probeMeta)) {
-                            if (!isset($_SESSION['bytea_columns'])) {
-                                $_SESSION['bytea_columns'] = [];
-                            }
-                            $newHash = md5($execQuery);
-                            $_SESSION['bytea_columns'][$newHash] = $probeMeta;
-                            $_SESSION['bytea_query_hash'] = $newHash;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Use the original (user-visible) query for display/history/navigation.
         $query = $displayQuery;
         $_REQUEST['query'] = $displayQuery;
-        // save the sql query in session for further use
         $_SESSION['sqlquery'] = $displayQuery;
 
         // Retrieve page from query.  $max_pages is returned by reference.
@@ -700,33 +420,7 @@ class RowBrowserRenderer extends AppContext
         $fkey_information = $this->getFKInfo();
 
         // Build strings for GETs in array
-        $_gets = [
-            'server' => $_REQUEST['server'],
-            'database' => $_REQUEST['database']
-        ];
-
-        if (isset($_REQUEST['schema']))
-            $_gets['schema'] = $_REQUEST['schema'];
-        if (isset($table_name))
-            $_gets[$subject] = $table_name;
-        if (isset($subject))
-            $_gets['subject'] = $subject;
-        if (isset($_REQUEST['query']) && mb_strlen($_REQUEST['query']) <= $conf['max_get_query_length'])
-            $_gets['query'] = $_REQUEST['query'];
-        if (isset($_REQUEST['count']))
-            $_gets['count'] = $_REQUEST['count'];
-        if (isset($_REQUEST['return']))
-            $_gets['return'] = $_REQUEST['return'];
-        if (isset($_REQUEST['search_path']))
-            $_gets['search_path'] = $_REQUEST['search_path'];
-        if (isset($_REQUEST['table']))
-            $_gets['table'] = $_REQUEST['table'];
-        if (isset($_REQUEST['orderby']))
-            $_gets['orderby'] = $_REQUEST['orderby'];
-        if (isset($_REQUEST['nohistory']))
-            $_gets['nohistory'] = $_REQUEST['nohistory'];
-        $_gets['strings'] = $_REQUEST['strings'];
-        $_gets['max_rows'] = $_REQUEST['max_rows'];
+        $_gets = $this->buildBrowseGets($subject, $table_name, $conf);
 
         // Save query to history if required
         if ($save_history) {
@@ -737,16 +431,8 @@ class RowBrowserRenderer extends AppContext
         unset($_sub_params['query']);
         unset($_sub_params['orderby']);
         unset($_sub_params['orderby_clear']);
-        // We adjust the form method via javascript to avoid length limits on GET requests
-        ?>
-        <form method="get" onsubmit="adjustQueryFormMethod(this)" action="display.php?<?= http_build_query($_sub_params) ?>">
-            <div>
-                <textarea name="query" id="query-editor" class="sql-editor frame resizable auto-expand" width="90%" rows="5"
-                    cols="100" resizable="true"><?= html_esc($query) ?></textarea>
-            </div>
-            <div><input type="submit" value="<?= $lang['strquerysubmit'] ?>" /></div>
-        </form>
-        <?php
+
+        $this->renderQueryForm($query, $_sub_params, $lang);
 
         echo '<div class="query-result-line">', htmlspecialchars($status_line), '</div>', "\n";
 
@@ -1024,10 +710,11 @@ class RowBrowserRenderer extends AppContext
             ];
 
         // Create view and download
-        if (isset($_REQUEST['query']) && isset($rs) && is_object($rs) && $rs->recordCount() > 0) {
+        if (isset($_REQUEST['query']) && is_object($rs) && $rs->recordCount() > 0) {
 
 
-            // Report views don't set a schema, so we need to disable create view in that case
+            // Report views don't set a schema, so we need to disable
+            // create view in that case
             if (isset($_REQUEST['schema'])) {
 
                 $navlinks['createview'] = [
@@ -1098,6 +785,342 @@ class RowBrowserRenderer extends AppContext
 
         $this->printAutoCompleteData();
         $this->printScripts();
+    }
+
+    private function prepareBrowseRequest(
+        $pg,
+        $conf,
+        TableActions $tableActions,
+        RowActions $rowActions,
+        SchemaActions $schemaActions,
+        PHPSQLParser $parser,
+        &$subject,
+        &$table_name,
+        &$type,
+        &$query,
+        &$parsed,
+        &$key_fields_early
+    ): bool {
+        if (!isset($_REQUEST['schema']))
+            $_REQUEST['schema'] = $pg->_schema;
+
+        if (isset($_REQUEST['fkey'])) {
+            $ops = [];
+            foreach ($_REQUEST['fkey'] as $x => $y) {
+                $ops[$x] = '=';
+            }
+            $query = $pg->getSelectSQL($_REQUEST['table'], [], $_REQUEST['fkey'], $ops);
+            $_REQUEST['query'] = $query;
+        }
+
+        if (isset($_REQUEST['search_path'])) {
+            if (
+                $schemaActions->setSearchPath(
+                    array_map('trim', explode(',', $_REQUEST['search_path']))
+                ) != 0
+            ) {
+                return false;
+            }
+        }
+
+        $subject = $_REQUEST['subject'] ?? '';
+        $table_name = $_REQUEST['table'] ?? $_REQUEST['view'] ?? null;
+
+        if (!empty($_REQUEST['query']) && !isSqlReadQuery($_REQUEST['query'])) {
+            $this->executeNonUpdateQuery($_REQUEST['query']);
+            $_REQUEST['query'] = $_SESSION['sqlquery'] ?? '';
+        }
+
+        if (isset($table_name)) {
+            $type = isset($_REQUEST['query']) ? 'SELECT' : 'TABLE';
+        } else {
+            if (empty($_REQUEST['query'])) {
+                $_REQUEST['query'] = $_SESSION['sqlquery'] ?? '';
+            }
+            $type = 'QUERY';
+        }
+
+        if (!empty($_REQUEST['query'])) {
+            $query = $_REQUEST['query'];
+            $parse_table = true;
+        } else {
+            $parse_table = false;
+            $query = "SELECT * FROM " . $pg->escapeIdentifier($_REQUEST['schema']);
+            if ($_REQUEST['subject'] == 'view') {
+                $query .= "." . $pg->escapeIdentifier($_REQUEST['view']) . ";";
+            } else {
+                $query .= "." . $pg->escapeIdentifier($_REQUEST['table']) . ";";
+            }
+        }
+
+        $parsed = $parser->parse($query);
+
+        if ($parse_table) {
+            if (!empty($parsed['SELECT']) && ($parsed['FROM'][0]['expr_type'] ?? '') == 'table') {
+                $parts = $parsed['FROM'][0]['no_quotes']['parts'] ?? [];
+                $changed = false;
+                if (count($parts) === 2) {
+                    [$schema, $table] = $parts;
+                    $changed = $_REQUEST['schema'] != $schema || $table_name != $table;
+                } else {
+                    [$table] = $parts;
+                    $schema = $_REQUEST['schema'] ?? $pg->_schema;
+                    if (empty($schema)) {
+                        $schema = $tableActions->findTableSchema($table) ?? '';
+                        if (!empty($schema)) {
+                            $misc = AppContainer::getMisc();
+                            $misc->setCurrentSchema($schema);
+                        }
+                    }
+                    $changed = $table_name != $table && !empty($schema);
+                }
+                if ($changed) {
+                    $misc = AppContainer::getMisc();
+                    $misc->setCurrentSchema($schema);
+                    $table_name = $table;
+                    unset($_REQUEST[$subject]);
+                    $subject = $tableActions->getTableType($schema, $table) ?? '';
+                    if (!empty($subject)) {
+                        $_REQUEST['subject'] = $subject;
+                        $_REQUEST[$subject] = $table;
+                    }
+                }
+            }
+        }
+
+        $key_fields_early = [];
+        if (isset($table_name)) {
+            $key_fields_early = $rowActions->getRowIdentifier($table_name);
+        }
+
+        return true;
+    }
+
+    private function applyOrderByFromRequest(&$query, $parsed, &$orderBySet): void
+    {
+        $orderbyClearRequested = !empty($_REQUEST['orderby_clear']);
+        if (!isset($_REQUEST['orderby']))
+            $_REQUEST['orderby'] = [];
+
+        $orderBySet = false;
+        $orderbyIsNonEmpty = is_array($_REQUEST['orderby']) && !empty($_REQUEST['orderby']);
+        if ($orderbyClearRequested) {
+            $_REQUEST['orderby'] = [];
+            $orderbyIsNonEmpty = false;
+        }
+
+        if ($orderbyIsNonEmpty || $orderbyClearRequested) {
+            if (!empty($parsed['SELECT'])) {
+                $newOrderBy = '';
+                if ($orderbyIsNonEmpty) {
+                    $newOrderBy = 'ORDER BY ';
+                    $sep = "";
+                    foreach ($_REQUEST['orderby'] as $field => $dir) {
+                        $dir = strcasecmp($dir, 'desc') === 0 ? 'DESC' : 'ASC';
+                        $newOrderBy .= $sep . pg_escape_id($field) . ' ' . $dir;
+                        $sep = ", ";
+                    }
+                }
+
+                if (!empty($parsed['ORDER'])) {
+                    $pattern = '/\s*ORDER\s+BY[\s\S]*?(?=\sLIMIT|\sOFFSET|\sFETCH|\sFOR|\sUNION|\sINTERSECT|\sEXCEPT|\)|--|\/\*|;|\s*$)/i';
+                    preg_match_all($pattern, $query, $matches);
+
+                    if (!empty($matches[0])) {
+                        $lastOrderBy = end($matches[0]);
+                        $query = str_replace($lastOrderBy, $newOrderBy === '' ? '' : ' ' . $newOrderBy, $query);
+                        $orderBySet = true;
+                    }
+                } elseif ($newOrderBy !== '') {
+                    $query = rtrim($query, " \t\n\r\0\x0B;");
+
+                    $pattern = '/\s*(?:'
+                        . '(?:LIMIT|OFFSET|FETCH|FOR|UNION|INTERSECT|EXCEPT)\b[^;]*'
+                        . '|'
+                        . '\)'
+                        . '|'
+                        . '--[^\r\n]*'
+                        . '|'
+                        . '\/\*.*?\*\/'
+                        . ')\s*$/is';
+
+                    if (preg_match($pattern, $query, $matches, PREG_OFFSET_CAPTURE)) {
+                        $endPos = $matches[0][1];
+                        $query = substr($query, 0, $endPos) . ' ' . $newOrderBy . substr($query, $endPos);
+                    } else {
+                        $query .= ' ' . $newOrderBy;
+                    }
+
+                    $query .= ';';
+                    $orderBySet = true;
+                }
+            }
+        } else {
+            if (!empty($parsed['ORDER'])) {
+                $_REQUEST['orderby'] = [];
+                foreach ($parsed['ORDER'] as $orderExpr) {
+                    $field = trim($orderExpr['base_expr'], " \t\n\r\0\x0B;");
+                    if (preg_match('/^"(?:[^"]|"")*"$/', $field)) {
+                        $field = str_replace('""', '"', substr($field, 1, -1));
+                    } elseif (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $field)) {
+                        continue;
+                    }
+                    $dir = strtolower($orderExpr['direction'] ?? '');
+                    if ($dir !== 'desc') {
+                        $dir = 'asc';
+                    }
+                    $_REQUEST['orderby'][$field] = $dir;
+                }
+                $orderBySet = true;
+            }
+        }
+    }
+
+    private function prepareExecQuery($query, PHPSQLParser $parser, RowActions $rowActions, $pg): array
+    {
+        $displayQuery = $query;
+        $execQuery = $displayQuery;
+
+        $execParsed = $parser->parse($execQuery);
+        if (!empty($execParsed['SELECT']) && !empty($execParsed['FROM']) && is_array($execParsed['FROM'])) {
+            $keyFieldsByAlias = [];
+            $schemaActionsForKeys = new SchemaActions($pg);
+            foreach ($execParsed['FROM'] as $from) {
+                if (($from['expr_type'] ?? '') !== 'table') {
+                    $keyFieldsByAlias = [];
+                    break;
+                }
+                $parts = $from['no_quotes']['parts'] ?? [];
+                if (empty($parts)) {
+                    continue;
+                }
+                if (count($parts) === 2) {
+                    $schemaName = $parts[0];
+                    $tableName = $parts[1];
+                } elseif (count($parts) === 1) {
+                    $schemaName = $_REQUEST['schema'] ?? $pg->_schema;
+                    $tableName = $parts[0];
+                } else {
+                    continue;
+                }
+                $alias = $from['alias']['name'] ?? $tableName;
+                if (empty($alias) || empty($tableName)) {
+                    continue;
+                }
+
+                $schemaActionsForKeys->setSchema($schemaName);
+                $keys = $rowActions->getRowIdentifier($tableName);
+                if (is_array($keys) && !empty($keys)) {
+                    $keyFieldsByAlias[$alias] = $keys;
+                }
+            }
+
+            if (!empty($keyFieldsByAlias)) {
+                $byteaModifier = new ByteaQueryModifier();
+                $modifierResult = $byteaModifier->modifyQuery($execParsed, $execQuery, $keyFieldsByAlias);
+                $execQuery = $modifierResult['query'];
+
+                if (!empty($modifierResult['bytea_columns'])) {
+                    $execHash = md5($execQuery);
+                    if (!isset($_SESSION['bytea_columns'])) {
+                        $_SESSION['bytea_columns'] = [];
+                    }
+                    $_SESSION['bytea_columns'][$execHash] = $modifierResult['bytea_columns'];
+                    $_SESSION['bytea_query_hash'] = $execHash;
+                }
+            }
+        }
+
+        $normalizedForProbe = preg_replace('/^(\s*--.*\n|\s*\/\*.*?\*\/)*/s', '', $execQuery);
+        $normalizedForProbe = ltrim($normalizedForProbe);
+        $isSelectOrWith = preg_match('/^(SELECT|WITH)\b/i', $normalizedForProbe);
+        if ($isSelectOrWith) {
+            $currentHash = md5($execQuery);
+            $alreadyHasMeta = !empty($_SESSION['bytea_columns'][$currentHash] ?? null);
+            if (!$alreadyHasMeta) {
+                $probe = new QueryResultMetadataProbe();
+                $probeResult = $probe->probeResultFields($execQuery);
+                if (!empty($probeResult['fields']) && empty($probeResult['has_duplicate_names'])) {
+                    $hasBytea = false;
+                    foreach ($probeResult['fields'] as $f) {
+                        if (!empty($f['is_bytea'])) {
+                            $hasBytea = true;
+                            break;
+                        }
+                    }
+                    if ($hasBytea) {
+                        $execQuery = $probe->rewriteQueryReplaceByteaWithLength($execQuery, $probeResult['fields']);
+                        $probeMeta = [];
+                        foreach ($probeResult['fields'] as $f) {
+                            if (!empty($f['is_bytea'])) {
+                                $probeMeta[$f['name']] = [
+                                    'schema' => null,
+                                    'table' => null,
+                                    'column' => $f['name'],
+                                    'key_fields' => [],
+                                ];
+                            }
+                        }
+                        if (!empty($probeMeta)) {
+                            if (!isset($_SESSION['bytea_columns'])) {
+                                $_SESSION['bytea_columns'] = [];
+                            }
+                            $newHash = md5($execQuery);
+                            $_SESSION['bytea_columns'][$newHash] = $probeMeta;
+                            $_SESSION['bytea_query_hash'] = $newHash;
+                        }
+                    }
+                }
+            }
+        }
+
+        return [$displayQuery, $execQuery];
+    }
+
+    private function buildBrowseGets($subject, $table_name, $conf): array
+    {
+        $_gets = [
+            'server' => $_REQUEST['server'],
+            'database' => $_REQUEST['database']
+        ];
+
+        if (isset($_REQUEST['schema']))
+            $_gets['schema'] = $_REQUEST['schema'];
+        if (isset($table_name))
+            $_gets[$subject] = $table_name;
+        if (isset($subject))
+            $_gets['subject'] = $subject;
+        if (isset($_REQUEST['query']) && mb_strlen($_REQUEST['query']) <= $conf['max_get_query_length'])
+            $_gets['query'] = $_REQUEST['query'];
+        if (isset($_REQUEST['count']))
+            $_gets['count'] = $_REQUEST['count'];
+        if (isset($_REQUEST['return']))
+            $_gets['return'] = $_REQUEST['return'];
+        if (isset($_REQUEST['search_path']))
+            $_gets['search_path'] = $_REQUEST['search_path'];
+        if (isset($_REQUEST['table']))
+            $_gets['table'] = $_REQUEST['table'];
+        if (isset($_REQUEST['orderby']))
+            $_gets['orderby'] = $_REQUEST['orderby'];
+        if (isset($_REQUEST['nohistory']))
+            $_gets['nohistory'] = $_REQUEST['nohistory'];
+        $_gets['strings'] = $_REQUEST['strings'];
+        $_gets['max_rows'] = $_REQUEST['max_rows'];
+
+        return $_gets;
+    }
+
+    private function renderQueryForm($query, $_sub_params, $lang): void
+    {
+        ?>
+        <form method="get" onsubmit="adjustQueryFormMethod(this)" action="display.php?<?= http_build_query($_sub_params) ?>">
+            <div>
+                <textarea name="query" id="query-editor" class="sql-editor frame resizable auto-expand" width="90%" rows="5"
+                    cols="100" resizable="true"><?= html_esc($query) ?></textarea>
+            </div>
+            <div><input type="submit" value="<?= $lang['strquerysubmit'] ?>" /></div>
+        </form>
+        <?php
     }
 
     function printAutoCompleteData()
