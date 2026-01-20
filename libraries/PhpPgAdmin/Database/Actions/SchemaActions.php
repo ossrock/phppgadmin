@@ -8,7 +8,8 @@ class SchemaActions extends AbstractActions
 {
     /**
      * Return all schemas in the current database.
-     * @param bool|null $showSystem whether to include system schemas; if null, use global setting
+     * @param bool|null $showSystem whether to include system schemas; if null,
+     * use global setting
      */
     public function getSchemas(bool $showSystem = null)
     {
@@ -33,8 +34,7 @@ class SchemaActions extends AbstractActions
             FROM pg_catalog.pg_namespace pn
             LEFT JOIN pg_catalog.pg_roles pu ON (pn.nspowner = pu.oid)
             {$where}
-            ORDER BY nspname
-        ";
+            ORDER BY nspname";
 
         return $this->connection->selectSet($sql);
     }

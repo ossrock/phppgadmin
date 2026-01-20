@@ -528,6 +528,7 @@ class CursorReader
                 $this->connection,
                 $this->tableName,
                 $this->schemaName,
+                null,
                 $this->relationKind
             );
 
