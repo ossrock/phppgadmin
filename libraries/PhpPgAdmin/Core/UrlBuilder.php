@@ -2,7 +2,7 @@
 
 namespace PhpPgAdmin\Core;
 
-class UrlBuilder extends AbstractContext
+class UrlBuilder extends AppContext
 {
     public function getHREF($excludeFrom = null): string
     {

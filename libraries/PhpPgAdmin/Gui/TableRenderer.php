@@ -2,13 +2,13 @@
 
 namespace PhpPgAdmin\Gui;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 
 /**
  * Table rendering: data grid with actions and multi-select
  * Extracts printTable() from legacy Misc class
  */
-class TableRenderer extends AbstractContext
+class TableRenderer extends AppContext
 {
     /**
      * Display a data table with optional actions and multi-select support.

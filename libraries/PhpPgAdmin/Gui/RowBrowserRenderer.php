@@ -4,7 +4,7 @@ namespace PhpPgAdmin\Gui;
 
 use PHPSQLParser\PHPSQLParser;
 use PhpPgAdmin\Core\AppContainer;
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 use PhpPgAdmin\Database\Actions\RowActions;
 use PhpPgAdmin\Database\ByteaQueryModifier;
 use PhpPgAdmin\Database\Actions\TableActions;
@@ -12,7 +12,7 @@ use PhpPgAdmin\Database\Actions\SchemaActions;
 use PhpPgAdmin\Database\QueryResultMetadataProbe;
 use PhpPgAdmin\Database\Actions\ConstraintActions;
 
-class RowBrowserRenderer extends AbstractContext
+class RowBrowserRenderer extends AppContext
 {
 
     /**
@@ -268,6 +268,60 @@ class RowBrowserRenderer extends AbstractContext
         }
     }
 
+    private function executeNonUpdateQuery($query)
+    {
+        $pg = AppContainer::getPostgres();
+        $misc = AppContainer::getMisc();
+        $lang = AppContainer::getLang();
+
+        $succeded = $pg->execute($query) === 0;
+
+        echo "<div class=\"query-box mb-2\">\n";
+
+        ?>
+        <pre class="p-2 sql-viewer"><?= htmlspecialchars($query) ?></pre>
+        <?php if (!$succeded): ?>
+            <div class="error p-1">
+                <?= htmlspecialchars($pg->conn->ErrorMsg()) ?>
+            </div>
+        <?php endif ?>
+        <div class="actions">
+            [<a href="javascript:void(0)" onclick="setEditorValue('query-editor', '<?= htmlspecialchars($query) ?>');">
+                <span class="psm">✎</span>
+                <?= htmlspecialchars($lang['stredit']) ?>
+            </a>]
+            <script>
+                function setEditorValue(id, content) {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        //console.log("Setting editor value for", id);
+                        if (element.beginEdit) {
+                            element.beginEdit(content);
+                        }
+                        else {
+                            element.value = content;
+                            element.focus();
+                        }
+                    }
+                }
+            </script>
+            <?php if ($succeded): ?>
+                <span class="query-stats ml-2">
+                    <?= format_string(
+                        $lang['strexecstats'],
+                        [
+                            'duration' => number_format($pg->lastQueryTime, 4),
+                            'rows' => $pg->affectedRows()
+                        ]
+                    ); ?>
+                </span>
+            <?php endif; ?>
+        </div>
+
+        <?php
+        echo "</div>\n";
+    }
+
     /**
      * Displays requested data
      */
@@ -288,7 +342,7 @@ class RowBrowserRenderer extends AbstractContext
         if (!isset($_REQUEST['schema']))
             $_REQUEST['schema'] = $pg->_schema;
 
-        // This code is used when browsing FK in pure-xHTML (without js)
+        // This code is used when browsing FK in pure HTML (without js)
         if (isset($_REQUEST['fkey'])) {
             $ops = [];
             foreach ($_REQUEST['fkey'] as $x => $y) {
@@ -313,6 +367,13 @@ class RowBrowserRenderer extends AbstractContext
         $subject = $_REQUEST['subject'] ?? '';
         $table_name = $_REQUEST['table'] ?? $_REQUEST['view'] ?? null;
 
+        if (!empty($_REQUEST['query']) && !isSqlReadQuery($_REQUEST['query'])) {
+            // process non-SELECT query separately
+            $this->executeNonUpdateQuery($_REQUEST['query']);
+            // restore last read query from session
+            $_REQUEST['query'] = $_SESSION['sqlquery'] ?? '';
+        }
+
         if (isset($table_name)) {
             if (isset($_REQUEST['query'])) {
                 //$misc->printTitle($lang['strselect']);
@@ -321,7 +382,7 @@ class RowBrowserRenderer extends AbstractContext
                 $type = 'TABLE';
             }
         } else {
-            if (!isset($_REQUEST['query'])) {
+            if (empty($_REQUEST['query'])) {
                 // if we come from sql.php or the query is too large to be passed
                 // via GET parameters, retrieve it from the session
                 $_REQUEST['query'] = $_SESSION['sqlquery'] ?? '';
@@ -680,8 +741,8 @@ class RowBrowserRenderer extends AbstractContext
         ?>
         <form method="get" onsubmit="adjustQueryFormMethod(this)" action="display.php?<?= http_build_query($_sub_params) ?>">
             <div>
-                <textarea name="query" class="sql-editor frame resizable auto-expand" width="90%" rows="5" cols="100"
-                    resizable="true"><?= html_esc($query) ?></textarea>
+                <textarea name="query" id="query-editor" class="sql-editor frame resizable auto-expand" width="90%" rows="5"
+                    cols="100" resizable="true"><?= html_esc($query) ?></textarea>
             </div>
             <div><input type="submit" value="<?= $lang['strquerysubmit'] ?>" /></div>
         </form>
@@ -766,6 +827,7 @@ class RowBrowserRenderer extends AbstractContext
 
             //echo "<div class=\"scroll-container\">\n";
             echo "<table id=\"data\"{$table_data}>\n";
+            echo "<thead id=\"sticky-thead\">\n";
             echo "<tr data-orderby-desc=\"", htmlspecialchars($lang['strorderbyhelp']), "\">\n";
 
             // Display edit and delete actions if we have a key
@@ -799,6 +861,8 @@ class RowBrowserRenderer extends AbstractContext
             $this->printTableHeaderCells($rs, $_gets, isset($table_name));
 
             echo "</tr>\n";
+            echo "</thead>\n";
+            echo "<tbody>\n";
 
             $i = 0;
             reset($rs->fields);
@@ -869,6 +933,7 @@ class RowBrowserRenderer extends AbstractContext
                 $rs->moveNext();
                 $i++;
             }
+            echo "</tbody>\n";
             echo "</table>\n";
             //echo "</div>\n";
 

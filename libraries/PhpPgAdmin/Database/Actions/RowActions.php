@@ -3,9 +3,9 @@
 namespace PhpPgAdmin\Database\Actions;
 
 use ADORecordSet;
-use PhpPgAdmin\Database\AbstractActions;
+use PhpPgAdmin\Database\AppActions;
 
-class RowActions extends AbstractActions
+class RowActions extends AppActions
 {
 	public $totalRowsFound = 0;
 	public $lastQueryLimit = 0;

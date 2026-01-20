@@ -314,6 +314,7 @@ $lang['strselectmaxrows'] = "Rows:";
 $lang['strjumppage'] = "Page:";
 $lang['strquerysubmit'] = "Send Query";
 $lang['strall'] = 'All';
+$lang['strexecstats'] = 'Execution took {duration} seconds, affecting {rows:d} row(s).';
 
 // Columns
 $lang['strcolprop'] = 'Column properties';

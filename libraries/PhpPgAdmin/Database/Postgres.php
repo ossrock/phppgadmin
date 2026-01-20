@@ -4,7 +4,7 @@ namespace PhpPgAdmin\Database;
 
 use ADORecordSet;
 
-class Postgres extends AbstractConnection
+class Postgres extends AppConnection
 {
 	// PostgreSQL-specific constants and metadata
 	public $major_version = 0.0;

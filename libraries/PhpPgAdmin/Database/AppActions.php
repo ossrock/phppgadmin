@@ -2,10 +2,10 @@
 
 namespace PhpPgAdmin\Database;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 use PhpPgAdmin\Database\Postgres;
 
-abstract class AbstractActions extends AbstractContext
+abstract class AppActions extends AppContext
 {
     /**
      * @var Postgres

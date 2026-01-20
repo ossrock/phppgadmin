@@ -2,9 +2,9 @@
 
 namespace PhpPgAdmin\Database\Actions;
 
-use PhpPgAdmin\Database\AbstractActions;
+use PhpPgAdmin\Database\AppActions;
 
-class CastActions extends AbstractActions
+class CastActions extends AppActions
 {
     /**
      * Returns a list of all casts in the database,

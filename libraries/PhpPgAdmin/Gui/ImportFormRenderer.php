@@ -2,11 +2,11 @@
 
 namespace PhpPgAdmin\Gui;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 use PhpPgAdmin\Database\Export\Compression\CompressionFactory;
 use PhpPgAdmin\Database\Actions\RoleActions;
 
-class ImportFormRenderer extends AbstractContext
+class ImportFormRenderer extends AppContext
 {
     public function renderImportForm(string $scope, array $options = []): void
     {

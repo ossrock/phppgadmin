@@ -2,13 +2,13 @@
 
 namespace PhpPgAdmin\Gui;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 
 /**
  * Topbar rendering: connection info and quick links
  * Extracts printTopbar() from legacy Misc class
  */
-class TopbarRenderer extends AbstractContext
+class TopbarRenderer extends AppContext
 {
     /**
      * Display the top bar with server connection info and quick links

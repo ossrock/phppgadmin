@@ -2,9 +2,9 @@
 
 namespace PhpPgAdmin\Database\Actions;
 
-use PhpPgAdmin\Database\AbstractActions;
+use PhpPgAdmin\Database\AppActions;
 
-class SqlFunctionActions extends AbstractActions
+class SqlFunctionActions extends AppActions
 {
 
     // Function properties

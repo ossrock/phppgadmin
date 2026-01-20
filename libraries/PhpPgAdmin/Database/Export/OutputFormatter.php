@@ -2,13 +2,13 @@
 
 namespace PhpPgAdmin\Database\Export;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 
 /**
  * Abstract base class for export output formatters.
  * Each formatter is responsible for transforming dumped data into a specific output format.
  */
-abstract class OutputFormatter extends AbstractContext
+abstract class OutputFormatter extends AppContext
 {
     /**
      * The MIME type for this format (e.g., 'text/plain', 'text/csv')

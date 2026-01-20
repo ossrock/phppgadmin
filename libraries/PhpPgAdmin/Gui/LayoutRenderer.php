@@ -2,11 +2,11 @@
 
 namespace PhpPgAdmin\Gui;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 use PhpPgAdmin\Core\AppContainer;
 use PhpPgAdmin\Misc;
 
-class LayoutRenderer extends AbstractContext
+class LayoutRenderer extends AppContext
 {
 	private $ajaxRequest = false;
 	private $frameContentRequest = false;

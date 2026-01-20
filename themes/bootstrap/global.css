@@ -162,11 +162,11 @@ p.message {
 }
 
 table.error {
-	background-color: #f5f5f5;
-}
-
-table.error td {
-	background-color: #f5f5f5;
+	background-color: #fff1f1;
+	width: 100%;
+	border-radius: 5px;
+	border-collapse: separate;
+	border: 3px solid #ffc1c1;
 }
 
 table.login {
@@ -764,3 +764,28 @@ label .icon {
 	border-radius: 5px;
 	box-shadow: inset 0px 0px 6px 0 rgba(0, 0, 0, 0.1);
 }
+
+.query-box {
+	border-radius: 5px;
+	padding: 0.5em;
+	border-width: 1pt;
+}
+
+/*
+.query-box {
+	background-color: #f7f4e8;
+	border: 1pt solid #dccfb7;
+	border-radius: 5px;
+	padding: 0.5em;
+}
+
+.query-box pre {
+	background-color: #fffdf4 !important;
+	border-radius: 5px;
+}
+
+.query-box .query-stats {
+	color: #968245;
+	font-style: italic;
+}
+*/

@@ -8,12 +8,12 @@
 namespace PhpPgAdmin\Database\Actions;
 
 use ADORecordSet;
-use PhpPgAdmin\Database\AbstractActions;
+use PhpPgAdmin\Database\AppActions;
 
 /**
  * Role action class - handles role, user, and group management
  */
-class RoleActions extends AbstractActions
+class RoleActions extends AppActions
 {
 
 	/**

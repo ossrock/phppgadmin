@@ -227,7 +227,10 @@ function doImport($msg = '')
 		doDefault($lang['strnotable']);
 		return;
 	}
-	if ($rs->fields['oid'] < 16384) {
+
+	$schemaActions = new SchemaActions($pg);
+	if ($schemaActions->isSystemSchema($pg->_schema)) {
+		$_SESSION['webdbLastTab']['table'] = '';
 		doDefault($lang['strsystemobjectdenied']);
 		return;
 	}

@@ -2,11 +2,11 @@
 
 namespace PhpPgAdmin\Gui;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 use PhpPgAdmin\Database\Actions\AclActions;
 use PhpPgAdmin\Database\Actions\RoleActions;
 
-class TabsRenderer extends AbstractContext
+class TabsRenderer extends AppContext
 {
 
     /**
@@ -90,9 +90,7 @@ class TabsRenderer extends AbstractContext
                         'urlvars' => ['subject' => 'server'],
                         'help' => 'pg.database',
                         'icon' => 'Databases',
-                    ]
-                ];
-                $tabs = array_merge($tabs, [
+                    ],
                     'roles' => [
                         'title' => $lang['strroles'],
                         'url' => 'roles.php',
@@ -100,10 +98,7 @@ class TabsRenderer extends AbstractContext
                         'hide' => $hideUsers,
                         'help' => 'pg.role',
                         'icon' => 'Roles',
-                    ]
-                ]);
-
-                $tabs = array_merge($tabs, [
+                    ],
                     'account' => [
                         'title' => $lang['straccount'],
                         'url' => 'roles.php',
@@ -134,7 +129,7 @@ class TabsRenderer extends AbstractContext
                         'hide' => empty($conf['import']['enabled']),
                         'icon' => 'Import',
                     ],
-                ]);
+                ];
                 break;
             case 'database':
                 $tabs = [
@@ -347,9 +342,6 @@ class TabsRenderer extends AbstractContext
                         'icon' => 'Import',
                     ],
                 ];
-                if (!$pg->hasFTS()) {
-                    unset($tabs['fulltext']);
-                }
                 break;
 
             case 'table':
@@ -456,13 +448,6 @@ class TabsRenderer extends AbstractContext
 
             case 'view':
                 $tabs = [
-                    'columns' => [
-                        'title' => $lang['strcolumns'],
-                        'url' => 'viewproperties.php',
-                        'urlvars' => ['subject' => 'view', 'view' => field('view')],
-                        'icon' => 'Columns',
-                        'branch' => true,
-                    ],
                     'browse' => [
                         'title' => $lang['strbrowse'],
                         'icon' => 'Table',
@@ -473,6 +458,13 @@ class TabsRenderer extends AbstractContext
                             'subject' => 'view',
                             'view' => field('view')
                         ],
+                    ],
+                    'columns' => [
+                        'title' => $lang['strcolumns'],
+                        'url' => 'viewproperties.php',
+                        'urlvars' => ['subject' => 'view', 'view' => field('view')],
+                        'icon' => 'Columns',
+                        'branch' => true,
                     ],
                     'select' => [
                         'title' => $lang['strselect'],
@@ -660,9 +652,9 @@ class TabsRenderer extends AbstractContext
     public function getLastTabURL($section)
     {
         $tabs = $this->getNavTabs($section);
-        //$tab = $tabs[$_SESSION['webdbLastTab'][$section]] ?? reset($tabs);
+        $tab = $tabs[$_SESSION['webdbLastTab'][$section] ?? ''] ?? reset($tabs);
         // Use first tab to avoid ambiguous behavior
-        $tab = reset($tabs);
+        //$tab = reset($tabs);
 
         return isset($tab['url']) ? $tab : null;
     }

@@ -2,13 +2,13 @@
 
 namespace PhpPgAdmin\Gui;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 
 /**
  * Navigation links rendering: action link lists
  * Extracts printNavLinks() from legacy Misc class
  */
-class NavLinksRenderer extends AbstractContext
+class NavLinksRenderer extends AppContext
 {
     /**
      * Display the navlinks

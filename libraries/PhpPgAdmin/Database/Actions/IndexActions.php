@@ -2,9 +2,9 @@
 
 namespace PhpPgAdmin\Database\Actions;
 
-use PhpPgAdmin\Database\AbstractActions;
+use PhpPgAdmin\Database\AppActions;
 
-class IndexActions extends AbstractActions
+class IndexActions extends AppActions
 {
     // Base constructor inherited from Actions
     public const INDEX_TYPES = ['BTREE', 'HASH', 'GIST', 'GIN'];

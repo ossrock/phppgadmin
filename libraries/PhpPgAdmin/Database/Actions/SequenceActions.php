@@ -2,9 +2,9 @@
 
 namespace PhpPgAdmin\Database\Actions;
 
-use PhpPgAdmin\Database\AbstractActions;
+use PhpPgAdmin\Database\AppActions;
 
-class SequenceActions extends AbstractActions
+class SequenceActions extends AppActions
 {
     // Base constructor inherited from Actions
 

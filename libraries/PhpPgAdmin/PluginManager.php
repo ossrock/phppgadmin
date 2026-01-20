@@ -2,13 +2,13 @@
 
 namespace PhpPgAdmin;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 
 /**
  * A class that implements the plugin's system
  */
 
-class PluginManager extends AbstractContext {
+class PluginManager extends AppContext {
 
 	/**
 	 * Attributes

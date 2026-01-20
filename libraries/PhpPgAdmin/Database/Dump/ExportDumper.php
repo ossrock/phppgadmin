@@ -2,7 +2,7 @@
 
 namespace PhpPgAdmin\Database\Dump;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 use PhpPgAdmin\Core\AppContainer;
 use PhpPgAdmin\Database\Actions\AclActions;
 use PhpPgAdmin\Database\Postgres;
@@ -10,7 +10,7 @@ use PhpPgAdmin\Database\Postgres;
 /**
  * Base class for all dumpers providing shared utilities.
  */
-abstract class ExportDumper extends AbstractContext
+abstract class ExportDumper extends AppContext
 {
     /**
      * @var Postgres

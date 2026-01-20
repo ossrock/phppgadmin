@@ -3,13 +3,13 @@
 namespace PhpPgAdmin\Database\Actions;
 
 use ADORecordSet;
-use PhpPgAdmin\Database\AbstractActions;
+use PhpPgAdmin\Database\AppActions;
 use PhpPgAdmin\Database\Actions\AclActions;
 use PhpPgAdmin\Database\Actions\ConstraintActions;
 use PhpPgAdmin\Database\Actions\IndexActions;
 use PhpPgAdmin\Database\Actions\RuleActions;
 
-class TableActions extends AbstractActions
+class TableActions extends AppActions
 {
     //public const 
 

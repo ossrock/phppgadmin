@@ -2,7 +2,7 @@
 
 namespace PhpPgAdmin\Database;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 
 /**
  * Probes a SELECT query's result metadata without scanning tables.
@@ -10,7 +10,7 @@ use PhpPgAdmin\Core\AbstractContext;
  * Uses a WHERE false wrapper so PostgreSQL returns a RowDescription
  * (column names + type OIDs) while producing zero rows.
  */
-class QueryResultMetadataProbe extends AbstractContext
+class QueryResultMetadataProbe extends AppContext
 {
     /**
      * PostgreSQL OID for bytea.

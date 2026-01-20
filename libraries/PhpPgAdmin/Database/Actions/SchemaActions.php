@@ -2,9 +2,9 @@
 
 namespace PhpPgAdmin\Database\Actions;
 
-use PhpPgAdmin\Database\AbstractActions;
+use PhpPgAdmin\Database\AppActions;
 
-class SchemaActions extends AbstractActions
+class SchemaActions extends AppActions
 {
     /**
      * Return all schemas in the current database.
@@ -39,7 +39,6 @@ class SchemaActions extends AbstractActions
         return $this->connection->selectSet($sql);
     }
 
-
     /**
      * Return all information relating to a schema.
      */
@@ -57,6 +56,14 @@ class SchemaActions extends AbstractActions
             FROM pg_catalog.pg_namespace pn
             WHERE pn.nspname = '{$schema}'";
         return $this->connection->selectSet($sql);
+    }
+
+    /**
+     * Determines if a schema is a system schema.
+     */
+    public function isSystemSchema($schema)
+    {
+        return substr_compare($schema, 'pg_', 0, 3) === 0 || $schema === 'information_schema';
     }
 
     /**

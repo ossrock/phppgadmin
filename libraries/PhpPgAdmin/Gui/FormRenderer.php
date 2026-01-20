@@ -2,9 +2,9 @@
 
 namespace PhpPgAdmin\Gui;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 
-class FormRenderer extends AbstractContext
+class FormRenderer extends AppContext
 {
 
 	/**

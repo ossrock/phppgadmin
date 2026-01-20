@@ -2,23 +2,23 @@
 
 namespace PhpPgAdmin\Database\Actions;
 
-use PhpPgAdmin\Database\AbstractActions;
+use PhpPgAdmin\Database\AppActions;
 use PhpPgAdmin\Database\Actions\SqlFunctionActions;
 
-class TriggerActions extends AbstractActions
+class TriggerActions extends AppActions
 {
-	public $triggerEvents = [
-		'INSERT',
-		'UPDATE',
-		'DELETE',
-		'INSERT OR UPDATE',
-		'INSERT OR DELETE',
-		'DELETE OR UPDATE',
-		'INSERT OR DELETE OR UPDATE'
-	];
+    public $triggerEvents = [
+        'INSERT',
+        'UPDATE',
+        'DELETE',
+        'INSERT OR UPDATE',
+        'INSERT OR DELETE',
+        'DELETE OR UPDATE',
+        'INSERT OR DELETE OR UPDATE'
+    ];
 
-	public $triggerExecTimes = ['BEFORE', 'AFTER'];
-	public $triggerFrequency = ['ROW', 'STATEMENT'];
+    public $triggerExecTimes = ['BEFORE', 'AFTER'];
+    public $triggerFrequency = ['ROW', 'STATEMENT'];
 
 
     /** @var SqlFunctionActions */
@@ -44,12 +44,18 @@ class TriggerActions extends AbstractActions
         $this->connection->clean($table);
         $this->connection->clean($trigger);
 
-        $sql = "
-            SELECT * FROM pg_catalog.pg_trigger t, pg_catalog.pg_class c
-            WHERE t.tgrelid=c.oid AND c.relname='{$table}' AND t.tgname='{$trigger}'
-                AND c.relnamespace=(
-                    SELECT oid FROM pg_catalog.pg_namespace
-                    WHERE nspname='{$c_schema}')";
+        $sql =
+            "SELECT 
+                t.*, 
+                pg_get_triggerdef(t.oid, true) AS trigger_def,
+                pg_get_functiondef(p.oid) AS function_def
+            FROM pg_trigger t
+            JOIN pg_class c ON t.tgrelid = c.oid
+            JOIN pg_namespace n ON c.relnamespace = n.oid
+            JOIN pg_proc p ON t.tgfoid = p.oid
+            WHERE c.relname = '{$table}'
+            AND t.tgname = '{$trigger}'
+            AND n.nspname = '{$c_schema}'";
 
         return $this->connection->selectSet($sql);
     }
@@ -88,11 +94,16 @@ class TriggerActions extends AbstractActions
     {
         $this->connection->fieldArrayClean($trigger);
 
-        if (!defined('TRIGGER_TYPE_ROW')) define('TRIGGER_TYPE_ROW', (1 << 0));
-        if (!defined('TRIGGER_TYPE_BEFORE')) define('TRIGGER_TYPE_BEFORE', (1 << 1));
-        if (!defined('TRIGGER_TYPE_INSERT')) define('TRIGGER_TYPE_INSERT', (1 << 2));
-        if (!defined('TRIGGER_TYPE_DELETE')) define('TRIGGER_TYPE_DELETE', (1 << 3));
-        if (!defined('TRIGGER_TYPE_UPDATE')) define('TRIGGER_TYPE_UPDATE', (1 << 4));
+        if (!defined('TRIGGER_TYPE_ROW'))
+            define('TRIGGER_TYPE_ROW', (1 << 0));
+        if (!defined('TRIGGER_TYPE_BEFORE'))
+            define('TRIGGER_TYPE_BEFORE', (1 << 1));
+        if (!defined('TRIGGER_TYPE_INSERT'))
+            define('TRIGGER_TYPE_INSERT', (1 << 2));
+        if (!defined('TRIGGER_TYPE_DELETE'))
+            define('TRIGGER_TYPE_DELETE', (1 << 3));
+        if (!defined('TRIGGER_TYPE_UPDATE'))
+            define('TRIGGER_TYPE_UPDATE', (1 << 4));
 
         $trigger['tgisconstraint'] = $this->connection->phpBool($trigger['tgisconstraint']);
         $trigger['tgdeferrable'] = $this->connection->phpBool($trigger['tgdeferrable']);

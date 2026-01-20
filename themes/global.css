@@ -79,6 +79,11 @@ html[dir="rtl"] #frameset {
 	padding-bottom: 1px;
 }
 
+thead#sticky-thead th {
+	position: sticky;
+	z-index: 5;
+}
+
 #loading-indicator {
 	position: fixed;
 	left: 0;
@@ -92,8 +97,8 @@ html[dir="rtl"] #frameset {
 	align-items: center;
 	padding: 3px;
 	border: 3px solid #ddf4ff;
-	background: linear-gradient(0deg, #d6f1ff 0%, #bcddf2 50%, #f0faff 100%);
-	opacity: 0.9;
+	background: linear-gradient(0deg, #daf2ff 0%, #d6efff 50%, #effaff 100%);
+	opacity: 0.55;
 }
 
 #loading-indicator.show {
@@ -754,4 +759,28 @@ pre code.hljs {
 
 .export-form .object-selection-list > div {
 	margin-right: 1em;
+}
+
+.query-box {
+	border: 1px solid #ccc;
+	background: #f9f9f9;
+	padding: 10px;
+	border-radius: 4px;
+}
+
+.query-box pre {
+	white-space: pre-wrap;
+	word-break: break-word;
+	border-bottom: 1px solid #d1d1d1;
+}
+
+.query-box .query-stats {
+	color: #757575;
+	font-style: italic;
+}
+
+.query-box .error {
+	color: #d32f2f;
+	font-weight: bold;
+	border-bottom: 1px solid #d1d1d1;
 }

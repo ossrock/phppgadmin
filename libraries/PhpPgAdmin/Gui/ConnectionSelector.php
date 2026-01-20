@@ -2,11 +2,11 @@
 
 namespace PhpPgAdmin\Gui;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 use PhpPgAdmin\Database\Actions\DatabaseActions;
 use PhpPgAdmin\Misc;
 
-class ConnectionSelector extends AbstractContext
+class ConnectionSelector extends AppContext
 {
 
     public function printConnection($onchange)

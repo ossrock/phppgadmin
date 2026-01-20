@@ -190,7 +190,7 @@ function frameSetHandler() {
 
 		// Also capture checkbox and radio states explicitly
 		form.querySelectorAll(
-			"input[type=checkbox], input[type=radio]"
+			"input[type=checkbox], input[type=radio]",
 		).forEach((input) => {
 			if (!formState[input.name]) {
 				formState[input.name] = [];
@@ -225,7 +225,7 @@ function frameSetHandler() {
 
 		// Restore text inputs, textareas, and selects
 		form.querySelectorAll(
-			"input[type=text], input[type=hidden], textarea, select"
+			"input[type=text], input[type=hidden], textarea, select",
 		).forEach((field) => {
 			if (formState[field.name] !== undefined) {
 				if (field.tagName === "SELECT") {
@@ -263,13 +263,13 @@ function frameSetHandler() {
 
 	function setStickyHeader() {
 		// Check if sticky header already exists
-		let sticky = content.querySelector("#sticky-header");
-		if (sticky) {
+		let stickyHeader = content.querySelector("#sticky-header");
+		if (stickyHeader) {
 			return;
 		}
-		sticky = document.createElement("div");
-		sticky.id = "sticky-header";
-		content.insertBefore(sticky, content.firstChild);
+		stickyHeader = document.createElement("div");
+		stickyHeader.id = "sticky-header";
+		content.insertBefore(stickyHeader, content.firstChild);
 
 		// Collect elements to be sticky
 		const stickyElements = [
@@ -279,10 +279,20 @@ function frameSetHandler() {
 		].filter(Boolean);
 
 		// Move elements into sticky container
-		stickyElements.forEach((el) => sticky.appendChild(el));
+		stickyElements.forEach((el) => stickyHeader.appendChild(el));
 
-		//const totalHeight = sticky.offsetHeight;
-		//content.style.paddingTop = totalHeight + "px";
+		// Get height of sticky header
+		const headerHeight = stickyHeader.getBoundingClientRect().height;
+
+		// Get sticky table header if exists
+		const stickyTableHead = content.querySelector("#sticky-thead");
+		if (stickyTableHead) {
+			// Set top dynamically (px)
+			stickyTableHead.querySelectorAll("th").forEach((th) => {
+				th.style.position = "sticky";
+				th.style.top = headerHeight + "px";
+			});
+		}
 	}
 
 	async function loadContent(url, options = {}, addToHistory = true) {
@@ -363,7 +373,7 @@ function frameSetHandler() {
 						// Fallback if sessionStorage quota exceeded
 						console.warn(
 							"sessionStorage quota exceeded, storing in history state",
-							e
+							e,
 						);
 						state.htmlLz = compressed;
 					}
@@ -530,7 +540,7 @@ function frameSetHandler() {
 			console.warn(
 				"Origin mismatch:",
 				event.origin,
-				window.location.origin
+				window.location.origin,
 			);
 			return;
 		}
@@ -618,7 +628,7 @@ function popupHandler() {
 					data: Object.fromEntries(formData.entries()),
 				},
 			},
-			window.opener.location.origin
+			window.opener.location.origin,
 		);
 	});
 
@@ -670,7 +680,7 @@ function popupHandler() {
 					url: target.href,
 				},
 			},
-			window.opener.location.origin
+			window.opener.location.origin,
 		);
 	});
 

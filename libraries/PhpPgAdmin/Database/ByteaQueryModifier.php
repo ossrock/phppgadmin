@@ -6,7 +6,7 @@
 
 namespace PhpPgAdmin\Database;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 use PhpPgAdmin\Database\Actions\SchemaActions;
 use PhpPgAdmin\Database\Actions\TableActions;
 
@@ -15,7 +15,7 @@ use PhpPgAdmin\Database\Actions\TableActions;
  * This avoids transferring large binary data over the network for display purposes.
  * Original bytea data can be downloaded separately via key-based lookup.
  */
-class ByteaQueryModifier extends AbstractContext
+class ByteaQueryModifier extends AppContext
 {
     /**
      * Modify a parsed SELECT query to replace bytea columns with octet_length() calls.

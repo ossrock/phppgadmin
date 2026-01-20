@@ -30,10 +30,15 @@ $lang = AppContainer::getLang();
 /**
  * Generate a descriptive filename for the query export.
  */
-function generateQueryExportFilename()
+function generateQueryExportFilename($table = null, $schema = null)
 {
 	$timestamp = date('Ymd_His');
-	return 'query_export_' . $timestamp;
+	if ($schema !== null && $table !== null) {
+		$prefix = $schema . '_' . $table;
+	} else {
+		$prefix = 'query_export';
+	}
+	return $prefix . '_' . $timestamp;
 }
 
 //AppContainer::setSkipHtmlFrame(true);
@@ -70,8 +75,11 @@ try {
 	exit;
 }
 
+$table = $_REQUEST['table'] ?? $_REQUEST['view'] ?? null;
+$schema = $pg->_schema;
+
 // Set up download headers and output handling
-$filename = generateQueryExportFilename();
+$filename = generateQueryExportFilename($table, $schema);
 $mime_type = $formatter->getMimeType();
 $file_extension = $formatter->getFileExtension();
 
@@ -101,8 +109,6 @@ $metadata = [
 	'bytea_encoding' => $_REQUEST['bytea_encoding'] ?? 'hex',
 	'column_names' => isset($_REQUEST['column_names']), // For CSV/TSV formatter
 ];
-$table = $_REQUEST['table'] ?? $_REQUEST['view'] ?? null;
-$schema = $pg->_schema;
 if ($table !== null) {
 	$metadata['table'] = $pg->quoteIdentifier($schema) . '.' . $pg->quoteIdentifier($table);
 }

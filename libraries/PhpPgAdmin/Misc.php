@@ -4,7 +4,7 @@ namespace PhpPgAdmin;
 
 use ADORecordSet;
 use Connection;
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 use PhpPgAdmin\Core\AppContainer;
 use PhpPgAdmin\Core\UrlBuilder;
 use PhpPgAdmin\Database\Actions\ConstraintActions;
@@ -23,7 +23,7 @@ use PhpPgAdmin\Gui\TrailRenderer;
 /**
  * Namespaced facade for the legacy Misc class.
  */
-class Misc extends AbstractContext
+class Misc extends AppContext
 {
 	// Tracking string to include in HREFs
 	var $href;

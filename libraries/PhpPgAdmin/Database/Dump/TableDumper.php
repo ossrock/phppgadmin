@@ -352,6 +352,9 @@ class TableDumper extends ExportDumper
     }
 
 
+    /**
+     * Dump autovacuum settings for the table.
+     */
     protected function dumpAutovacuumSettings($table, $schema)
     {
         $adminActions = new AdminActions($this->connection);

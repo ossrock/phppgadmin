@@ -7,9 +7,9 @@ namespace PhpPgAdmin\Database;
 
 use ADOConnection;
 use ADORecordSet;
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 
-abstract class AbstractConnection extends AbstractContext
+abstract class AppConnection extends AppContext
 {
 
 	/**
@@ -166,6 +166,8 @@ abstract class AbstractConnection extends AbstractContext
 		return pg_escape_bytea($this->conn->_connectionID, $str);
 	}
 
+	public $lastQueryTime = null;
+
 	/**
 	 * Executes a query on the underlying connection
 	 * @param string $sql The SQL query to execute
@@ -173,11 +175,20 @@ abstract class AbstractConnection extends AbstractContext
 	 */
 	function execute($sql)
 	{
+		$start = microtime(true);
+
 		// Execute the statement
 		$this->conn->Execute($sql);
 
+		$this->lastQueryTime = microtime(true) - $start;
+
 		// Return error code
 		return $this->conn->ErrorNo();
+	}
+
+	function affectedRows()
+	{
+		return $this->conn->Affected_Rows();
 	}
 
 	/**
@@ -188,8 +199,6 @@ abstract class AbstractConnection extends AbstractContext
 	{
 		$this->conn->close();
 	}
-
-	public $lastQueryTime = null;
 
 	/**
 	 * Retrieves a ResultSet from a query
@@ -204,18 +213,12 @@ abstract class AbstractConnection extends AbstractContext
 		// Execute the statement
 		$rs = $this->conn->Execute($sql);
 
-		$end = microtime(true);
-		$this->lastQueryTime = $end - $start;
+		$this->lastQueryTime = microtime(true) - $start;
 
 		if (!$rs)
 			return $this->conn->ErrorNo();
 
 		return $rs;
-	}
-
-	public function getLastQueryTime()
-	{
-		return $this->lastQueryTime;
 	}
 
 	/**
@@ -230,8 +233,12 @@ abstract class AbstractConnection extends AbstractContext
 	 */
 	function selectField($sql, $field)
 	{
+		$start = microtime(true);
+
 		// Execute the statement
 		$rs = $this->conn->Execute($sql);
+
+		$this->lastQueryTime = microtime(true) - $start;
 
 		// If failure, or no rows returned, return error value
 		if (!$rs)

@@ -1,6 +1,6 @@
 <?php
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 use PhpPgAdmin\Database\Actions\DatabaseActions;
 use PhpPgAdmin\Database\Actions\SchemaActions;
 use PhpPgAdmin\Database\Postgres;
@@ -13,7 +13,7 @@ use PhpPgAdmin\Database\Postgres;
  * $Id: Reports.php,v 1.18 2007/04/16 11:02:35 mr-russ Exp $
  */
 
-class Reports extends AbstractContext
+class Reports extends AppContext
 {
 
 	/**

@@ -429,7 +429,8 @@ function doImport()
 		doDefault($lang['strnoschema']);
 		return;
 	}
-	if ($rs->fields['oid'] < 16384) {
+	if ($schemaActions->isSystemSchema($_REQUEST['schema'])) {
+		$_SESSION['webdbLastTab']['schema'] = '';
 		doDefault($lang['strsystemobjectdenied']);
 		return;
 	}

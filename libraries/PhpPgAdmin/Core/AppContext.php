@@ -6,10 +6,9 @@ namespace PhpPgAdmin\Core;
 
 use PhpPgAdmin\Misc;
 use PhpPgAdmin\PluginManager;
-use PhpPgAdmin\Database\Postgres as PostgresNew;
-use Postgres as PostgresLegacy;
+use PhpPgAdmin\Database\Postgres;
 
-abstract class AbstractContext
+abstract class AppContext
 {
 
 	protected function lang(): array
@@ -22,7 +21,7 @@ abstract class AbstractContext
 		return AppContainer::getConf();
 	}
 
-	protected function postgres(): ?PostgresNew
+	protected function postgres(): ?Postgres
 	{
 		return AppContainer::getPostgres();
 	}

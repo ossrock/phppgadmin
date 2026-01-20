@@ -396,7 +396,12 @@
 			editor.renderer.$cursorLayer.element.style.display = "";
 		});
 
+		hidden.id = element.id;
 		hidden.value = editor.getValue();
+		hidden.beginEdit = (content) => {
+			editor.setValue(content, -1);
+			editor.focus();
+		};
 
 		if (element.classList.contains("auto-expand")) {
 			// We resize the editor height according to content but not below

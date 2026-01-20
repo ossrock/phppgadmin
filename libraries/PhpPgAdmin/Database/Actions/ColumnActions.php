@@ -2,9 +2,9 @@
 
 namespace PhpPgAdmin\Database\Actions;
 
-use PhpPgAdmin\Database\AbstractActions;
+use PhpPgAdmin\Database\AppActions;
 
-class ColumnActions extends AbstractActions
+class ColumnActions extends AppActions
 {
     public const EXCLUDE_TYPES = [
 

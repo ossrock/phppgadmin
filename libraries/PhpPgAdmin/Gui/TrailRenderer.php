@@ -2,13 +2,13 @@
 
 namespace PhpPgAdmin\Gui;
 
-use PhpPgAdmin\Core\AbstractContext;
+use PhpPgAdmin\Core\AppContext;
 
 /**
  * Trail rendering: breadcrumb navigation hierarchy
  * Extracts getTrail() and printTrail() from legacy Misc class
  */
-class TrailRenderer extends AbstractContext
+class TrailRenderer extends AppContext
 {
 
     /**
