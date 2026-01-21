@@ -179,62 +179,38 @@ class TableActions extends AppActions
      */
     public function getTableAttributes($table, $field = '')
     {
-        $c_schema = $this->connection->_schema;
-        $this->connection->clean($c_schema);
+        $schema = $this->connection->_schema;
+        $this->connection->clean($schema);
         $this->connection->clean($table);
         $this->connection->clean($field);
 
-        if ($field == '') {
-            $sql =
-                "SELECT
-                    a.attname, a.attnum,
-                    pg_catalog.format_type(a.atttypid, a.atttypmod) as type,
-                    a.atttypmod,
-                    a.attnotnull, a.atthasdef, pg_catalog.pg_get_expr(adef.adbin, adef.adrelid, true) as adsrc,
-                    a.attstattarget, a.attstorage, t.typstorage,
-                    (
-                        SELECT 1 FROM pg_catalog.pg_depend pd, pg_catalog.pg_class pc
-                        WHERE pd.objid=pc.oid
-                        AND pd.classid=pc.tableoid
-                        AND pd.refclassid=pc.tableoid
-                        AND pd.refobjid=a.attrelid
-                        AND pd.refobjsubid=a.attnum
-                        AND pd.deptype='i'
-                        AND pc.relkind='S'
-                    ) IS NOT NULL AS attisserial,
-                    pg_catalog.col_description(a.attrelid, a.attnum) AS comment
-                FROM
-                    pg_catalog.pg_attribute a LEFT JOIN pg_catalog.pg_attrdef adef
-                    ON a.attrelid=adef.adrelid
-                    AND a.attnum=adef.adnum
-                    LEFT JOIN pg_catalog.pg_type t ON a.atttypid=t.oid
-                WHERE
-                    a.attrelid = (SELECT oid FROM pg_catalog.pg_class WHERE relname='{$table}'
-                        AND relnamespace = (SELECT oid FROM pg_catalog.pg_namespace WHERE
-                        nspname = '{$c_schema}'))
-                    AND a.attnum > 0 AND NOT a.attisdropped
-                ORDER BY a.attnum";
-        } else {
-            $sql =
-                "SELECT
-                    a.attname, a.attnum,
-                    pg_catalog.format_type(a.atttypid, a.atttypmod) as type,
-                    pg_catalog.format_type(a.atttypid, NULL) as base_type,
-                    a.atttypmod,
-                    a.attnotnull, a.atthasdef, pg_catalog.pg_get_expr(adef.adbin, adef.adrelid, true) as adsrc,
-                    a.attstattarget, a.attstorage, t.typstorage,
-                    pg_catalog.col_description(a.attrelid, a.attnum) AS comment
-                FROM
-                    pg_catalog.pg_attribute a LEFT JOIN pg_catalog.pg_attrdef adef
-                    ON a.attrelid=adef.adrelid
-                    AND a.attnum=adef.adnum
-                    LEFT JOIN pg_catalog.pg_type t ON a.atttypid=t.oid
-                WHERE
-                    a.attrelid = (SELECT oid FROM pg_catalog.pg_class WHERE relname='{$table}'
-                        AND relnamespace = (SELECT oid FROM pg_catalog.pg_namespace WHERE
-                        nspname = '{$c_schema}'))
-                    AND a.attname = '{$field}'";
-        }
+        $whereField = $field !== ''
+            ? "AND a.attname = '{$field}'"
+            : "AND a.attnum > 0 AND NOT a.attisdropped";
+
+        $sql =
+            "SELECT
+                a.attname,
+                a.attnum,
+                format_type(a.atttypid, a.atttypmod) AS type,
+                a.atttypmod,
+                a.attnotnull,
+                a.atthasdef,
+                pg_get_expr(ad.adbin, ad.adrelid, true) AS adsrc,
+                a.attstattarget,
+                a.attstorage,
+                t.typstorage,
+                col_description(a.attrelid, a.attnum) AS comment
+            FROM pg_attribute a
+            LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
+            LEFT JOIN pg_type t ON a.atttypid = t.oid
+            WHERE a.attrelid = (
+                SELECT oid FROM pg_class
+                WHERE relname = '{$table}'
+                AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = '{$schema}')
+            )
+            {$whereField}
+            ORDER BY a.attnum";
 
         return $this->connection->selectSet($sql);
     }
@@ -248,19 +224,26 @@ class TableActions extends AppActions
         $this->connection->clean($c_schema);
         $this->connection->clean($table);
 
-        $sql = "
-            SELECT
+        $sql =
+            "SELECT
                 pn.nspname, relname
             FROM
                 pg_catalog.pg_class pc, pg_catalog.pg_inherits pi, pg_catalog.pg_namespace pn
             WHERE
-                pc.oid=pi.inhparent
-                AND pc.relnamespace=pn.oid
-                AND pi.inhrelid = (SELECT oid from pg_catalog.pg_class WHERE relname='{$table}'
-                    AND relnamespace = (SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = '{$c_schema}'))
+                pc.oid = pi.inhparent
+                AND pc.relnamespace = pn.oid
+                AND pi.inhrelid = (
+                    SELECT oid
+                    from pg_catalog.pg_class
+                    WHERE relname = '{$table}'
+                        AND relnamespace = (
+                            SELECT oid
+                            FROM pg_catalog.pg_namespace
+                            WHERE nspname = '{$c_schema}'
+                        )
+                    )
             ORDER BY
-                pi.inhseqno
-        ";
+                pi.inhseqno";
 
         return $this->connection->selectSet($sql);
     }

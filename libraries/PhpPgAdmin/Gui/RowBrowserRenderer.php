@@ -340,7 +340,7 @@ class RowBrowserRenderer extends AppContext
         }
     }
 
-    private function executeNonUpdateQuery($query)
+    private function executeNonUpdateQuery($query, $save_history)
     {
         $pg = AppContainer::getPostgres();
         $misc = AppContainer::getMisc();
@@ -348,6 +348,9 @@ class RowBrowserRenderer extends AppContext
 
         $query = trim($query);
         $succeded = $pg->execute($query) === 0;
+        if ($save_history) {
+            $misc->saveSqlHistory($query, false);
+        }
 
         echo "<div class=\"query-box mb-2\">\n";
 
@@ -954,7 +957,7 @@ class RowBrowserRenderer extends AppContext
         $table_name = $_REQUEST['table'] ?? $_REQUEST['view'] ?? null;
 
         if (!empty($_REQUEST['query']) && !isSqlReadQuery($_REQUEST['query'])) {
-            $this->executeNonUpdateQuery($_REQUEST['query']);
+            $this->executeNonUpdateQuery($_REQUEST['query'], !isset($_REQUEST['nohistory']));
             $_REQUEST['query'] = $_SESSION['sqlquery'] ?? '';
         }
 

@@ -520,7 +520,7 @@ class ByteaQueryModifier extends AppContext
 
     /**
      * Reconstruct SQL query from modified parsed structure.
-     * This is a simplified reconstruction - for complex queries, we fall back to regex replacement.
+     * Only modifies the SELECT clause, keeping other parts unchanged.
      *
      * @param array  $parsed Modified parsed query
      * @param string $originalQuery Original query for fallback
@@ -529,26 +529,54 @@ class ByteaQueryModifier extends AppContext
      */
     private function reconstructQuery($parsed, $originalQuery)
     {
-        // Build SELECT clause
+        // Build SELECT clause by reconstructing each item
         $selectParts = [];
         foreach ($parsed['SELECT'] as $item) {
+            $expr = $this->reconstructExpression($item);
+
             if (!empty($item['alias']['name'])) {
-                // Has alias
-                $selectParts[] = $item['base_expr'] . ' AS ' . pg_escape_id($item['alias']['name']);
+                $selectParts[] = $expr . ' AS ' . $item['alias']['name'];
             } else {
-                $selectParts[] = $item['base_expr'];
+                $selectParts[] = $expr;
             }
         }
         $selectClause = 'SELECT ' . implode(', ', $selectParts);
 
-        // Find the original SELECT clause in the query and replace it
-        // Use regex to find SELECT ... FROM
+        // Replace only the SELECT clause in the original query
         if (preg_match('/^(.*?)\bSELECT\b\s+(.+?)\s+\bFROM\b(.*)$/is', $originalQuery, $matches)) {
-            // Reconstruct: prefix + new SELECT + FROM + suffix
             return $matches[1] . $selectClause . ' FROM' . $matches[3];
         }
 
-        // Fallback: couldn't parse reliably, return original
+        // Complete fallback: return original query unchanged
         return $originalQuery;
+    }
+
+    /**
+     * Recursively reconstruct an expression from parsed structure.
+     *
+     * @param array $item Parsed expression item
+     *
+     * @return string Reconstructed expression
+     */
+    private function reconstructExpression($item)
+    {
+        $exprType = $item['expr_type'] ?? '';
+
+        // For aggregate_function and simple_function, reconstruct with arguments
+        if ($exprType === 'aggregate_function' || $exprType === 'simple_function') {
+            $funcName = $item['base_expr'];
+            $args = [];
+
+            if (!empty($item['sub_tree']) && is_array($item['sub_tree'])) {
+                foreach ($item['sub_tree'] as $arg) {
+                    $args[] = $this->reconstructExpression($arg);
+                }
+            }
+
+            return $funcName . '(' . implode(', ', $args) . ')';
+        }
+
+        // For other expression types, use base_expr
+        return $item['base_expr'] ?? '';
     }
 }

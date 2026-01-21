@@ -325,7 +325,7 @@ function doSaveAddColumn()
 				'index' => $i,
 				'field' => trim($_POST['field'][$i]),
 				'type' => isset($_POST['type'][$i]) ? $_POST['type'][$i] : '',
-				'array' => isset($_POST['array'][$i]) && $_POST['array'][$i] != '',
+				'array' => $_POST['array'][$i] ?? '',
 				'length' => isset($_POST['length'][$i]) ? $_POST['length'][$i] : '',
 				'notnull' => isset($_POST['notnull'][$i]),
 				'default' => $defaultValue,

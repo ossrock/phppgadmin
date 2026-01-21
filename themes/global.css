@@ -815,11 +815,8 @@ textarea.popup-field-input,
 .sql-editor.resizable.popup-field-input {
 	resize: both;
 	min-height: 80px;
-	min-width: 300px;
-}
-
-.popup-field-options {
-	font-size: 12px;
+	min-width: 333px;
+	width: 333px;
 }
 
 .popup-field-options label {

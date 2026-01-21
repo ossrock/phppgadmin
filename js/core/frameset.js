@@ -1,4 +1,5 @@
 //#region IndexedDB Manager for POST result caching
+
 class PostCacheDB {
 	constructor() {
 		this.dbName = "phpPgAdminCache";

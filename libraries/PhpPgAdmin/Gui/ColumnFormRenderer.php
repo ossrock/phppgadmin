@@ -118,12 +118,10 @@ class ColumnFormRenderer
                 $field = $col['attname'] ?? '';
                 $type = $col['base_type'] ?? '';
 
-                // Check if it's an array type
-                if (substr($type, -2) == '[]') {
+                // Check if it is an array type
+                $array = strstr($type, '[]') ?: '';
+                if (!empty($array)) {
                     $type = substr($type, 0, -2);
-                    $array = '[]';
-                } else {
-                    $array = '';
                 }
 
                 $length = $col['length'] ?? '';

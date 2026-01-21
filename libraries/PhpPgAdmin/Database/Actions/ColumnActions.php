@@ -74,6 +74,19 @@ class ColumnActions extends AppActions
         '"char"',
     ];
 
+    public const NON_SORTABLE_TYPES = [
+        'xml',
+        'json',
+        'bytea',
+        'tsvector',
+        'tsquery',
+        'record'
+    ];
+
+    public const NON_COMPARABLE_TYPES = [
+        'xml',
+        'record',
+    ];
 
     /**
      * @var array

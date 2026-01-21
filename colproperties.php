@@ -88,7 +88,7 @@ function doSaveAlter()
 	$columnActions = new ColumnActions($pg);
 
 
-	// Check inputs - support both array[0] and plain syntax for backwards compatibility
+	// Check inputs
 	$field = $_REQUEST['field'][0] ?? '';
 	$type = $_REQUEST['type'][0] ?? '';
 	$length = $_REQUEST['length'][0] ?? '';
@@ -159,7 +159,7 @@ function doDefault($msg = '', $isTable = true)
 	};
 
 	if (empty($_REQUEST['column']))
-		$msg .= "<br/>{$lang['strnoobjects']}";
+		$msg .= "<br>{$lang['strnoobjects']}";
 
 	$misc->printTrail('column');
 	//$misc->printTitle($lang['strcolprop']);
@@ -171,6 +171,7 @@ function doDefault($msg = '', $isTable = true)
 		$tdata = $tableActions->getTable($tableName);
 		// Get columns
 		$attrs = $tableActions->getTableAttributes($tableName, $_REQUEST['column']);
+		$type = $attrs->fields['type'];
 
 		// Show comment if any
 		if ($attrs->fields['comment'] !== null):
@@ -183,31 +184,40 @@ function doDefault($msg = '', $isTable = true)
 			'column' => [
 				'title' => $lang['strcolumn'],
 				'field' => field('attname'),
+				'icon' => 'Column',
 			],
 			'type' => [
 				'title' => $lang['strtype'],
-				'field' => field('+type'),
-			]
-		];
-
-		if ($isTable) {
-			$column['notnull'] = [
+				'field' => field('type'),
+			],
+			'notnull' => [
 				'title' => $lang['strnotnull'],
 				'field' => field('attnotnull'),
 				'type' => 'bool',
 				'params' => ['true' => 'NOT NULL', 'false' => '']
-			];
-			$column['default'] = [
+			],
+			'default' => [
 				'title' => $lang['strdefault'],
 				'field' => field('adsrc'),
-			];
+			],
+			/*
+			'comment' => [
+				'title' => $lang['strcomment'],
+				'field' => field('comment'),
+				'type' => 'comment',
+			],
+			*/
+		];
+
+		if (!$isTable) {
+			unset($column['notnull'], $column['default']);
 		}
 
 		$actions = [];
 		$misc->printTable($attrs, $column, $actions, 'colproperties-colproperties', null, $attPre);
 
 		?>
-		<br />
+		<br>
 		<?php
 
 		$f_attname = $_REQUEST['column'];
@@ -216,7 +226,14 @@ function doDefault($msg = '', $isTable = true)
 		$pg->fieldClean($f_attname);
 		$pg->fieldClean($f_table);
 		$pg->fieldClean($f_schema);
-		$query = "SELECT \"{$f_attname}\", count(*) AS \"count\" FROM \"{$f_schema}\".\"{$f_table}\" GROUP BY \"{$f_attname}\" ORDER BY \"{$f_attname}\"";
+
+		if (in_array($type, ColumnActions::NON_SORTABLE_TYPES)) {
+			$order_clause = '';
+		} else {
+			$order_clause = " ORDER BY \"{$f_attname}\"";
+		}
+
+		$query = "SELECT \"{$f_attname}\", count(*) AS \"count\" FROM \"{$f_schema}\".\"{$f_table}\" GROUP BY \"{$f_attname}\"{$order_clause}";
 
 		if ($isTable) {
 
@@ -241,7 +258,7 @@ function doDefault($msg = '', $isTable = true)
 							]
 						]
 					],
-					'icon' => $misc->icon('browsedata'),
+					'icon' => $misc->icon('Table'),
 					'content' => $lang['strbrowse'],
 				],
 				'alter' => [
@@ -258,6 +275,7 @@ function doDefault($msg = '', $isTable = true)
 							]
 						]
 					],
+					'icon' => $misc->icon('Edit'),
 					'content' => $lang['stralter'],
 				],
 				'drop' => [
@@ -274,6 +292,7 @@ function doDefault($msg = '', $isTable = true)
 							]
 						]
 					],
+					'icon' => $misc->icon('Delete'),
 					'content' => $lang['strdrop'],
 				]
 			];
@@ -296,10 +315,16 @@ function doDefault($msg = '', $isTable = true)
 							]
 						]
 					],
+					'icon' => $misc->icon('View'),
 					'content' => $lang['strbrowse']
 				]
 			];
 		}
+
+		if (in_array($type, ColumnActions::NON_COMPARABLE_TYPES)) {
+			unset($navlinks['browse']);
+		}
+
 
 		$misc->printNavLinks($navlinks, 'colproperties-colproperties', get_defined_vars());
 	}
