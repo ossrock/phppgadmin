@@ -1,6 +1,199 @@
-/** Frameset handler simulating frameset behavior */
+//#region IndexedDB Manager for POST result caching
+class PostCacheDB {
+	constructor() {
+		this.dbName = "phpPgAdminCache";
+		this.storeName = "postResults";
+		this.dbVersion = 1;
+		this.db = null;
+		this.initPromise = this.init();
+	}
 
-function frameSetHandler() {
+	async init() {
+		return new Promise((resolve, reject) => {
+			const request = indexedDB.open(this.dbName, this.dbVersion);
+
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => {
+				this.db = request.result;
+				resolve(this.db);
+			};
+
+			request.onupgradeneeded = (event) => {
+				const db = event.target.result;
+				if (!db.objectStoreNames.contains(this.storeName)) {
+					const store = db.createObjectStore(this.storeName, {
+						keyPath: "key",
+					});
+					// Index by sessionId for efficient cleanup
+					store.createIndex("sessionId", "sessionId", {
+						unique: false,
+					});
+					// Index by timestamp for age-based cleanup
+					store.createIndex("timestamp", "timestamp", {
+						unique: false,
+					});
+				}
+			};
+		});
+	}
+
+	getCookie(name) {
+		const match = document.cookie.match(
+			new RegExp("(^| )" + name + "=([^;]+)"),
+		);
+		return match ? match[2] : null;
+	}
+
+	getSessionId() {
+		return this.getCookie("PPA_ID") || "unknown";
+	}
+
+	async set(key, value) {
+		await this.initPromise;
+		return new Promise((resolve, reject) => {
+			const transaction = this.db.transaction(
+				[this.storeName],
+				"readwrite",
+			);
+			const store = transaction.objectStore(this.storeName);
+			const data = {
+				key: key,
+				value: value,
+				sessionId: this.getSessionId(),
+				timestamp: Date.now(),
+			};
+			const request = store.put(data);
+
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => resolve();
+		});
+	}
+
+	async get(key) {
+		await this.initPromise;
+		return new Promise((resolve, reject) => {
+			const transaction = this.db.transaction(
+				[this.storeName],
+				"readonly",
+			);
+			const store = transaction.objectStore(this.storeName);
+			const request = store.get(key);
+
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => {
+				const result = request.result;
+				if (result) {
+					// Verify the entry belongs to current session
+					if (result.sessionId === this.getSessionId()) {
+						resolve(result.value);
+					} else {
+						// Entry from different session - ignore it
+						resolve(null);
+					}
+				} else {
+					resolve(null);
+				}
+			};
+		});
+	}
+
+	async delete(key) {
+		await this.initPromise;
+		return new Promise((resolve, reject) => {
+			const transaction = this.db.transaction(
+				[this.storeName],
+				"readwrite",
+			);
+			const store = transaction.objectStore(this.storeName);
+			const request = store.delete(key);
+
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => resolve();
+		});
+	}
+
+	async cleanupOldEntries(maxAgeMs = 24 * 60 * 60 * 1000) {
+		// Default: 24 hours
+		await this.initPromise;
+		return new Promise((resolve, reject) => {
+			const transaction = this.db.transaction(
+				[this.storeName],
+				"readwrite",
+			);
+			const store = transaction.objectStore(this.storeName);
+			const index = store.index("timestamp");
+			const cutoffTime = Date.now() - maxAgeMs;
+
+			// Get all entries older than cutoff
+			const range = IDBKeyRange.upperBound(cutoffTime);
+			const request = index.openCursor(range);
+			let deletedCount = 0;
+
+			request.onerror = () => reject(request.error);
+			request.onsuccess = (event) => {
+				const cursor = event.target.result;
+				if (cursor) {
+					cursor.delete();
+					deletedCount++;
+					cursor.continue();
+				} else {
+					console.log(
+						`Cleaned up ${deletedCount} old entries from IndexedDB`,
+					);
+					resolve(deletedCount);
+				}
+			};
+		});
+	}
+
+	async cleanupOtherSessions() {
+		await this.initPromise;
+		const currentSessionId = this.getSessionId();
+		return new Promise((resolve, reject) => {
+			const transaction = this.db.transaction(
+				[this.storeName],
+				"readwrite",
+			);
+			const store = transaction.objectStore(this.storeName);
+			const request = store.openCursor();
+			let deletedCount = 0;
+
+			request.onerror = () => reject(request.error);
+			request.onsuccess = (event) => {
+				const cursor = event.target.result;
+				if (cursor) {
+					if (cursor.value.sessionId !== currentSessionId) {
+						cursor.delete();
+						deletedCount++;
+					}
+					cursor.continue();
+				} else {
+					console.log(
+						`Cleaned up ${deletedCount} entries from other sessions`,
+					);
+					resolve(deletedCount);
+				}
+			};
+		});
+	}
+
+	async cleanup() {
+		// Clean up both old entries and entries from other sessions
+		try {
+			await this.cleanupOldEntries(365 * 24 * 60 * 60 * 1000); // 1 year
+			await this.cleanupOtherSessions();
+		} catch (error) {
+			console.error("Error during IndexedDB cleanup:", error);
+		}
+	}
+}
+
+//#endregion
+
+//#region Frameset handler simulating frameset behavior
+
+/** @var {PostCacheDB} postCacheDB */
+function frameSetHandler(postCacheDB) {
 	const isRtl = document.documentElement.getAttribute("dir") === "rtl";
 	const tree = document.getElementById("tree");
 	const content = document.getElementById("content");
@@ -358,7 +551,7 @@ function frameSetHandler() {
 				// Build history state
 				const state = {};
 
-				// For POST requests, cache HTML in sessionStorage
+				// For POST requests, cache HTML in IndexedDB
 				if (/post/i.test(options.method ?? "")) {
 					const compressed = LZString.compressToUTF16(responseText);
 					const storageKey =
@@ -367,12 +560,12 @@ function frameSetHandler() {
 						"_" +
 						Math.random().toString(36).substring(2, 11);
 					try {
-						sessionStorage.setItem(storageKey, compressed);
+						await postCacheDB.set(storageKey, compressed);
 						state.storageKey = storageKey;
 					} catch (e) {
-						// Fallback if sessionStorage quota exceeded
+						// Fallback if IndexedDB fails
 						console.warn(
-							"sessionStorage quota exceeded, storing in history state",
+							"IndexedDB storage failed, storing in history state",
 							e,
 						);
 						state.htmlLz = compressed;
@@ -504,15 +697,15 @@ function frameSetHandler() {
 		}
 	});
 
-	window.addEventListener("popstate", (e) => {
+	window.addEventListener("popstate", async (e) => {
 		const url = window.location.href;
 
 		let htmlLz = null;
 		if (e.state?.storageKey) {
-			// Cached content found in sessionStorage
-			htmlLz = sessionStorage.getItem(e.state.storageKey);
+			// Cached content found in IndexedDB
+			htmlLz = await postCacheDB.get(e.state.storageKey);
 		} else if (e.state && e.state.htmlLz) {
-			// Fallback: direct HTML in state (for quota exceeded case)
+			// Fallback: direct HTML in state (for storage failure case)
 			htmlLz = e.state.htmlLz;
 		}
 
@@ -569,7 +762,9 @@ function frameSetHandler() {
 	return true;
 }
 
-/** Popup handler intecepting form submissions and links */
+//#endregion
+
+//#region Popup handler intecepting form submissions and links
 
 function popupHandler() {
 	document.addEventListener("submit", (e) => {
@@ -687,9 +882,16 @@ function popupHandler() {
 	return true;
 }
 
+//#endregion
+
+// Initialize frameset or popup handler
+
 (function () {
+	// Initialize the cache DB
+	const postCacheDB = new PostCacheDB();
+
 	// Try to initialize frameset handler, if not possible, fallback to popup handler
-	frameSetHandler() || popupHandler();
+	frameSetHandler(postCacheDB) || popupHandler();
 
 	const content = document.getElementById("content");
 
@@ -701,4 +903,11 @@ function popupHandler() {
 		});
 		document.dispatchEvent(event);
 	});
+
+	// Run cleanup on page load to remove old entries and entries from other sessions
+	postCacheDB
+		.cleanup()
+		.catch((err) =>
+			console.error("Failed to cleanup IndexedDB cache:", err),
+		);
 })();
