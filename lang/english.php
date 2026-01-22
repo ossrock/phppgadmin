@@ -658,6 +658,7 @@ $lang['strfunctioncosting'] = 'Function Costing';
 $lang['strresultrows'] = 'Result Rows';
 $lang['strexecutioncost'] = 'Execution Cost';
 $lang['strspecifyfunctiontodrop'] = 'You must specify at least one function to drop.';
+$lang['strchoosefunction'] = 'Choose function';
 
 // Triggers
 $lang['strtrigger'] = 'Trigger';

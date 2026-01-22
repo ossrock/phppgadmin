@@ -686,8 +686,8 @@
 			const newValue = checkedRadio
 				? checkedRadio.value
 				: inputField.value;
-			const isNull = nullCheckbox && nullCheckbox.checked;
-			const isExpr = exprCheckbox && exprCheckbox.checked;
+			const isNull = nullCheckbox?.checked ?? false;
+			const isExpr = exprCheckbox?.checked ?? false;
 			const functionValue = functionSelect && functionSelect.value;
 			console.log(
 				"New Value:",

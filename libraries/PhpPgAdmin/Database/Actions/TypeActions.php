@@ -25,6 +25,133 @@ class TypeActions extends AppActions
         'record' => 'record',
     ];
 
+    protected const INTERNAL_TYPE_MAP = [
+        'int2' => 'smallint',
+        'int4' => 'integer',
+        'int8' => 'bigint',
+        'float4' => 'real',
+        'float8' => 'double precision',
+
+        'varchar' => 'character varying',
+        'bpchar' => 'character',
+
+        'bool' => 'boolean',
+
+        'time' => 'time without time zone',
+        'timetz' => 'time with time zone',
+        'timestamp' => 'timestamp without time zone',
+        'timestamptz' => 'timestamp with time zone',
+    ];
+
+    protected const EXTERNAL_TYPE_MAP = [
+        'smallint' => 'int2',
+        'integer' => 'int4',
+        'bigint' => 'int8',
+        'real' => 'float4',
+        'double precision' => 'float8',
+        'character varying' => 'varchar',
+        'character' => 'bpchar',
+        'boolean' => 'bool',
+        'time without time zone' => 'time',
+        'time with time zone' => 'timetz',
+        'timestamp without time zone' => 'timestamp',
+        'timestamp with time zone' => 'timestamptz',
+    ];
+
+    /**
+     * Maps an external type name to its internal representation.
+     * timestamp(6) with time zone[] --> _timestamptz(6)
+     */
+    public static function mapToInternal(string $t): string
+    {
+        $t = strtolower(trim($t));
+
+        $isArray = false;
+        if (substr_compare($t, '[]', -2) === 0) {
+            $isArray = true;
+            $t = trim(substr($t, 0, -2));
+        }
+
+        $size = '';
+        $trailing = '';
+        $baseNoSize = $t;
+        if (preg_match('/^(.+?)\s*\(\s*([^)]+?)\s*\)\s*(.*)$/', $t, $m)) {
+            $baseNoSize = trim($m[1]);
+            $size = "({$m[2]})";
+            $trailing = trim($m[3]);
+        } elseif (preg_match('/^(.+?)\s+(.*)$/', $t, $m)) {
+            $baseNoSize = trim($m[1]);
+            $trailing = trim($m[2]);
+        }
+
+        // Use EXTERNAL_TYPE_MAP to map external -> internal
+        $internalBase = self::EXTERNAL_TYPE_MAP[$baseNoSize] ?? $baseNoSize;
+
+        // Decide whether to keep size with internal base. Here we keep it.
+        $internal = $internalBase . $size;
+        if (!empty($trailing)) {
+            $internal = trim($internal . ' ' . $trailing);
+        }
+
+        if ($isArray) {
+            return "_$internal";
+        }
+
+        return $internal;
+    }
+
+    /**
+     * Maps an internal type name to its external representation.
+     * _timestamp(6) --> timestamp(6) without time zone[]
+     */
+    public static function mapToExternal(string $t): string
+    {
+        $t = strtolower(trim($t));
+
+        $isArray = false;
+        if (str_starts_with($t, '_')) {
+            $isArray = true;
+            $t = trim(substr($t, 1));
+        }
+
+        $size = '';
+        $trailing = '';
+        $baseNoSize = $t;
+        if (preg_match('/^(.+?)\s*\(\s*([^)]+?)\s*\)\s*(.*)$/', $t, $m)) {
+            $baseNoSize = trim($m[1]);
+            $size = "({$m[2]})";
+            $trailing = trim($m[3]);
+        } elseif (preg_match('/^(.+?)\s+(.*)$/', $t, $m)) {
+            $baseNoSize = trim($m[1]);
+            $trailing = trim($m[2]);
+        }
+
+        // Use INTERNAL_TYPE_MAP to map internal -> external
+        $externalBase = self::INTERNAL_TYPE_MAP[$baseNoSize] ?? $baseNoSize;
+
+        $out = $externalBase;
+        if ($size !== '') {
+            if (strpos($externalBase, ' with ') !== false || strpos($externalBase, ' without ') !== false) {
+                $pos = strpos($externalBase, ' ');
+                $out = ($pos !== false)
+                    ? substr($externalBase, 0, $pos) . $size . substr($externalBase, $pos)
+                    : $externalBase . $size;
+            } else {
+                $out = $externalBase . $size;
+            }
+        }
+
+        if (!empty($trailing)) {
+            $out = trim($out . ' ' . $trailing);
+        }
+
+        if ($isArray) {
+            return "{$out}[]";
+        }
+
+        return $out;
+    }
+
 
     /**
      * Returns all details for a particular type.
@@ -95,86 +222,62 @@ class TypeActions extends AppActions
         return $this->connection->selectSet($sql);
     }
 
-    /**
-     * Normalizes a type name to its internal representation.
-     */
-    private function normalizeTypeName(string $t): string
-    {
-        $t = strtolower($t);
-
-        // Recognize Array types first
-        $isArray = false;
-        if (substr($t, -2) === '[]') {
-            $isArray = true;
-            $t = substr($t, 0, -2); // Extract base type
-        }
-
-        // SQL → internal mapping
-        static $map = [
-        'integer' => 'int4',
-        'smallint' => 'int2',
-        'bigint' => 'int8',
-        'character varying' => 'varchar',
-        'character' => 'bpchar',
-        'timestamp without time zone' => 'timestamp',
-        'timestamp with time zone' => 'timestamptz',
-        ];
-
-        $internal = $map[$t] ?? $t;
-
-        // Array types internally with underscore
-        if ($isArray) {
-            return '_' . $internal;
-        }
-
-        return $internal;
-    }
-
-    /**
-     * Returns type metadata for a list of type names.
-     */
     public function getTypeMetasByNames(array $typeNames)
     {
         if (empty($typeNames)) {
             return [];
         }
 
-        $queryTypes = [];
-        foreach ($typeNames as $t) {
-            $t = $this->normalizeTypeName($t);
-            $t = $this->connection->escapeLiteral($t);
-            $queryTypes[] = $t;
+        // Build VALUES list of escaped literals
+        $values = [];
+        foreach ($typeNames as $external) {
+            $externalTrim = trim($external);
+            $escaped = $this->connection->escapeLiteral($externalTrim);
+            $values[] = "($escaped)";
         }
 
+        $valuesList = implode(',', $values);
+
+        // Use regtype to resolve each textual type to its oid, then join pg_type
         $sql =
-            "SELECT 
+            "WITH inputs(input_text) AS (
+                VALUES {$valuesList}
+            )
+            SELECT
+                i.input_text,
+                t.oid,
                 t.typname,
                 t.typtype,
                 t.typlen,
-                t.typcategory,
-                t.typbasetype::regtype AS base_type
-            FROM pg_type t
-            WHERE t.typname IN (" . implode(',', $queryTypes) . ")";
+                t.typelem,
+                t.typinput,
+                t.typbasetype::regtype AS base_type,
+                format_type(t.oid, NULL) AS canonical_name
+            FROM inputs i
+            JOIN pg_type t ON t.oid = (i.input_text::regtype)::oid";
 
         $rs = $this->connection->selectSet($sql);
 
         $metas = [];
-        if (is_object($rs) && $rs->recordCount() > 0) {
+        if (\is_object($rs)) {
             while (!$rs->EOF) {
-                $metas[$rs->fields['typname']] = $rs->fields;
+                $inputText = $rs->fields['input_text'];
+                $metas[$inputText] = $rs->fields;
                 $rs->moveNext();
             }
         }
+
         return $metas;
     }
 
-    /**
-     * Determines if a type is a large type (varlena) or not.
-     */
+
     public function isLargeTypeMeta($meta)
     {
         // Arrays are always varlena
-        if ($meta['typcategory'] === 'A') {
+        if (
+            $meta['typelem'] != '0' &&
+            $meta['typinput'] === 'array_in'
+        ) {
             return true;
         }
 
@@ -184,7 +287,7 @@ class TypeActions extends AppActions
         }
 
         // varlena → large
-        if ($meta['typlen'] == -1) {
+        if ($meta['typlen'] == '-1') {
             return true;
         }
 

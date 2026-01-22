@@ -1,15 +1,16 @@
 <?php
 
-use PhpPgAdmin\Core\AppContainer;
-use PhpPgAdmin\Database\Actions\ConstraintActions;
-use PhpPgAdmin\Database\Actions\RowActions;
-use PhpPgAdmin\Database\Actions\SchemaActions;
-use PhpPgAdmin\Database\Actions\TableActions;
-use PhpPgAdmin\Database\ByteaQueryModifier;
-use PhpPgAdmin\Database\QueryResultMetadataProbe;
-use PhpPgAdmin\Gui\FormRenderer;
-use PhpPgAdmin\Gui\RowBrowserRenderer;
 use PHPSQLParser\PHPSQLParser;
+use PhpPgAdmin\Gui\FormRenderer;
+use PhpPgAdmin\Core\AppContainer;
+use PhpPgAdmin\Gui\RowBrowserRenderer;
+use PhpPgAdmin\Database\Actions\RowActions;
+use PhpPgAdmin\Database\ByteaQueryModifier;
+use PhpPgAdmin\Database\Actions\TypeActions;
+use PhpPgAdmin\Database\Actions\TableActions;
+use PhpPgAdmin\Database\Actions\SchemaActions;
+use PhpPgAdmin\Database\QueryResultMetadataProbe;
+use PhpPgAdmin\Database\Actions\ConstraintActions;
 
 /**
  * Common relation browsing function that can be used for views,
@@ -152,264 +153,8 @@ function doEditRow($confirm, $msg = '')
 		}
 	}
 
-	if ($confirm) {
-
-		$formRenderer = new FormRenderer();
-
-		//var_dump($keyFields);
-		$initial = empty($_POST);
-
-		$misc->printTrail($_REQUEST['subject']);
-		$misc->printTitle($insert ? $lang['strinsertrow'] : $lang['streditrow']);
-		$misc->printMsg($msg);
-
-		if (($conf['autocomplete'] != 'disable')) {
-			$fksprops = $misc->getAutocompleteFKProperties($_REQUEST['table'], 'insert');
-			if ($fksprops !== false)
-				echo $fksprops['code'];
-		} else
-			$fksprops = false;
-
-		[$functions_by_category, $all_functions] = $formRenderer->prepareFieldFunctions();
-		$byteaInlineLimit = isset($conf['bytea_inline_limit']) ? (int) $conf['bytea_inline_limit'] : 1024 * 1024;
-		if ($byteaInlineLimit < 0) {
-			$byteaInlineLimit = 0;
-		}
-
-		$parseSize = function ($value) {
-			$unit = strtoupper(substr(trim($value), -1));
-			$number = (int) $value;
-			switch ($unit) {
-				case 'G':
-					return $number * 1024 * 1024 * 1024;
-				case 'M':
-					return $number * 1024 * 1024;
-				case 'K':
-					return $number * 1024;
-				default:
-					return (int) $value;
-			}
-		};
-
-		$byteaMaxUploadSize = isset($conf['bytea_max_upload_size']) ? (int) $conf['bytea_max_upload_size'] : 0;
-		if ($byteaMaxUploadSize <= 0) {
-			$uploadMax = $parseSize(ini_get('upload_max_filesize'));
-			$postMax = $parseSize(ini_get('post_max_size'));
-			$byteaMaxUploadSize = min($uploadMax, $postMax);
-		}
-
-		echo "<form action=\"display.php\" method=\"post\" id=\"ac_form\" enctype=\"multipart/form-data\">\n";
-		$error = true;
-		if ($attrs->recordCount() > 0 && ($insert || $rs->recordCount() == 1)) {
-			echo "<table class=\"data\">\n";
-
-			// Output table header
-			echo "<tr>\n";
-			//echo "<th class=\"data\"></th>\n";
-			echo "<th class=\"data\">{$lang['strcolumn']}</th>\n";
-			echo "<th class=\"data\">{$lang['strtype']}</th>";
-			echo "<th class=\"data\">{$lang['strfunction']}</th>\n";
-			echo "<th class=\"data\">{$lang['strnull']}</th>\n";
-			echo "<th class=\"data\">{$lang['strvalue']}</th>\n";
-			echo "<th class=\"data\">{$lang['strexpr']}</th>\n";
-			echo "</tr>";
-
-			$i = 0;
-			while (!$attrs->EOF) {
-
-				$attrs->fields['attnotnull'] = $pg->phpBool($attrs->fields['attnotnull']);
-				$id = (($i & 1) == 0 ? '1' : '2');
-
-				// Initialise variables
-				//if (!isset($_REQUEST['format'][$attrs->fields['attname']]))
-				//	$_REQUEST['format'][$attrs->fields['attname']] = 'VALUE';
-
-				if ($initial) {
-					if ($insert) {
-						$value = $attrs->fields['adsrc'];
-						if (!empty($value)) {
-							$search = str_replace("()", " ()", strtoupper($value));
-							$function = $all_functions[$search] ?? null;
-							if (!empty($function)) {
-								// use function
-								$_REQUEST['format'][$attrs->fields['attname']] = $function;
-								$value = '';
-							} else {
-								// use expression
-								$_REQUEST['expr'][$attrs->fields['attname']] = 1;
-							}
-							//$_REQUEST['expr'][$attrs->fields['attname']] = 1;
-						}
-					} else {
-						$value = $rs->fields[$attrs->fields['attname']];
-					}
-				} else {
-					$value = $_REQUEST["values"][$attrs->fields['attname']];
-				}
-
-				echo "<tr class=\"data{$id}\">\n";
-				//echo "<td class=\"info\">#", $i+1, "</td>";
-				echo "<th>", $misc->printVal($attrs->fields['attname']), "</th>";
-				echo "<td>\n";
-				echo $misc->printVal($pg->formatType($attrs->fields['type'], $attrs->fields['atttypmod']));
-				//echo "<input type=\"hidden\" name=\"types[", htmlspecialchars($attrs->fields['attname']), "]\" value=\"", htmlspecialchars($attrs->fields['type']), "\" /></td>";
-				echo "<td>\n";
-				$formRenderer->printFieldFunctions(
-					"format[{$attrs->fields['attname']}]",
-					$_REQUEST['format'][$attrs->fields['attname']] ?? '',
-					[
-						'id' => "sel_fnc_" . htmlspecialchars($attrs->fields['attname'])
-					],
-				);
-				echo "</td>\n";
-				echo "<td class=\"text-center\">";
-				// Output null box if the column allows nulls (doesn't look at CHECKs or ASSERTIONS)
-				if (!$attrs->fields['attnotnull']) {
-					// Set initial null values
-					if ($initial && ($insert || $rs->fields[$attrs->fields['attname']] === null)) {
-						$_REQUEST['nulls'][$attrs->fields['attname']] = 'on';
-					}
-					$null_cb_id = "cb_null_" . htmlspecialchars($attrs->fields['attname']);
-					echo "<label><span><input type=\"checkbox\" name=\"nulls[{$attrs->fields['attname']}]\" id=\"$null_cb_id\"",
-						isset($_REQUEST['nulls'][$attrs->fields['attname']]) ? ' checked="checked"' : '', " /></span></label>\n";
-				} else {
-					echo "&nbsp;";
-					$null_cb_id = "";
-				}
-				echo "</td>\n";
-
-				echo "<td id=\"row_att_{$attrs->fields['attnum']}\">";
-
-				$extras = [
-					'data-field' => $attrs->fields['attname'],
-				];
-
-				//$extras['onChange'] = 'document.getElementById("' . $sel_fnc_id . '").value = "";';
-
-				// If the column allows nulls, then we put a JavaScript action on
-				// the data field to unset the NULL checkbox as soon as anything
-				// is entered in the field.
-				if (!$attrs->fields['attnotnull']) {
-					$extras['onChange'] = 'document.getElementById("' . $null_cb_id . '").checked = false;';
-				}
-
-				if (($fksprops !== false) && isset($fksprops['byfield'][$attrs->fields['attnum']])) {
-					$extras['id'] = "attr_{$attrs->fields['attnum']}";
-					$extras['autocomplete'] = 'off';
-					$extras['data-fk-context'] = 'insert';
-					$extras['data-attnum'] = $attrs->fields['attnum'];
-				}
-
-				$type = $attrs->fields['type'] ?? '';
-				$options = null;
-				if (strpos($type, 'bytea') === 0) {
-					$downloadUrl = null;
-					if (!$insert && !empty($keyFields)) {
-						$params = [
-							'action' => 'downloadbytea',
-							'server' => $_REQUEST['server'],
-							'database' => $_REQUEST['database'],
-							'schema' => $schema,
-							'table' => $_REQUEST['table'],
-							'column' => $attrs->fields['attname'],
-							'key' => $keyFields,
-							'output' => 'download', // for frameset.js to detect
-						];
-						$downloadUrl = 'display.php?' . http_build_query($params);
-					}
-					$options = [
-						'is_insert' => $insert,
-						'size' => $byteaSizes[$attrs->fields['attname']] ?? null,
-						'limit' => $byteaInlineLimit,
-						'download_url' => $downloadUrl,
-						'max_upload_size' => $byteaMaxUploadSize,
-					];
-					if ($initial && !empty($value) && !str_starts_with($value, '\\x')) {
-						$value = '\\x' . bin2hex($value);
-					}
-				}
-
-				$formRenderer->printField(
-					"values[{$attrs->fields['attname']}]",
-					$value,
-					$attrs->fields['type'],
-					$extras,
-					$options
-				);
-
-				echo "</td>";
-				echo "<td class=\"text-center\">\n";
-				$expr_cb_id = "cb_expr_" . htmlspecialchars($attrs->fields['attname']);
-				echo "<label><span><input type=\"checkbox\" id=\"$expr_cb_id\" name=\"expr[{$attrs->fields['attname']}]\"",
-					!empty($_REQUEST['expr'][$attrs->fields['attname']]) ? ' checked="checked"' : '', " /></span></label>\n";
-				echo "</td>";
-				echo "</tr>\n";
-				$i++;
-				$attrs->moveNext();
-			}
-			echo "</table>\n";
-
-			$error = false;
-		} elseif ($rs->recordCount() != 1) {
-			echo "<p>{$lang['strrownotunique']}</p>\n";
-		} else {
-			echo "<p>{$lang['strinvalidparam']}</p>\n";
-		}
-
-		echo "<input type=\"hidden\" name=\"action\" value=\"editrow\" />\n";
-		echo $misc->form;
-		if ($insert) {
-			if (!isset($_SESSION['counter']))
-				$_SESSION['counter'] = 0;
-			echo "<input type=\"hidden\" name=\"protection_counter\" value=\"" . $_SESSION['counter'] . "\" />\n";
-		} else {
-			foreach ($keyFields as $field => $val) {
-				echo "<input type=\"hidden\" name=\"key[", htmlspecialchars($field), "]\" value=\"", htmlspecialchars($val), "\" />\n";
-			}
-			//echo "<input type=\"hidden\" name=\"key\" value=\"", html_esc(urlencode(serialize($keyFields))), "\" />\n";
-		}
-		if (isset($_REQUEST['table']))
-			echo "<input type=\"hidden\" name=\"table\" value=\"", htmlspecialchars($_REQUEST['table']), "\" />\n";
-		if (isset($_REQUEST['subject']))
-			echo "<input type=\"hidden\" name=\"subject\" value=\"", htmlspecialchars($_REQUEST['subject']), "\" />\n";
-		if (isset($_REQUEST['query']))
-			echo "<input type=\"hidden\" name=\"query\" value=\"", htmlspecialchars($_REQUEST['query']), "\" />\n";
-		if (isset($_REQUEST['count']))
-			echo "<input type=\"hidden\" name=\"count\" value=\"", htmlspecialchars($_REQUEST['count']), "\" />\n";
-		if (isset($_REQUEST['return']))
-			echo "<input type=\"hidden\" name=\"return\" value=\"", htmlspecialchars($_REQUEST['return']), "\" />\n";
-		if (isset($_REQUEST['page']))
-			echo "<input type=\"hidden\" name=\"page\" value=\"", htmlspecialchars($_REQUEST['page']), "\" />\n";
-		if (isset($_REQUEST['orderby'])) {
-			foreach ($_REQUEST['orderby'] as $field => $val) {
-				echo "<input type=\"hidden\" name=\"orderby[", htmlspecialchars($field), "]\" value=\"", htmlspecialchars($val), "\" />\n";
-			}
-		}
-		if (isset($_REQUEST['strings']))
-			echo "<input type=\"hidden\" name=\"strings\" value=\"", htmlspecialchars($_REQUEST['strings']), "\" />\n";
-
-		echo "<p>";
-		if ($insert) {
-			echo "<input type=\"submit\" name=\"insert\" value=\"{$lang['strinsert']}\" />\n";
-			echo "<input type=\"submit\" name=\"insert_and_repeat\" accesskey=\"r\" value=\"{$lang['strinsertandrepeat']}\" />\n";
-		} else {
-			if (!$error)
-				echo "<input type=\"submit\" name=\"save\" accesskey=\"r\" value=\"{$lang['strsave']}\" />\n";
-		}
-		echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" />\n";
-
-		if ($fksprops !== false) {
-			echo "&nbsp;&nbsp;&nbsp;";
-			if ($conf['autocomplete'] != 'default off')
-				echo "<input type=\"checkbox\" id=\"no_ac\" value=\"1\" checked=\"checked\" /> <label for=\"no_ac\"> {$lang['strac']}</label>\n";
-			else
-				echo "<input type=\"checkbox\" id=\"no_ac\" value=\"0\" /> <label for=\"no_ac\"> {$lang['strac']}</label>\n";
-		}
-
-		echo "</p>\n";
-		echo "</form>\n";
-	} else {
-
+	if (!$confirm) {
+		// Insert or update the row
 		if (!isset($_POST['values']))
 			$_POST['values'] = [];
 		if (!isset($_POST['nulls']))
@@ -474,6 +219,7 @@ function doEditRow($confirm, $msg = '')
 		}
 
 		if ($insert) {
+			// Insert new row
 			if ($_SESSION['counter']++ == $_POST['protection_counter']) {
 				$status = $rowActions->insertRow(
 					$_POST['table'],
@@ -499,6 +245,7 @@ function doEditRow($confirm, $msg = '')
 			} else
 				doEditRow(true, $lang['strrowduplicate']);
 		} else {
+			// Update existing row
 			$status = $rowActions->editRow(
 				$_POST['table'],
 				$_POST['values'],
@@ -515,7 +262,282 @@ function doEditRow($confirm, $msg = '')
 			else
 				doEditRow(true, $lang['strrowupdatedbad']);
 		}
+
+		return;
 	}
+
+	$formRenderer = new FormRenderer();
+
+	//var_dump($keyFields);
+	$initial = empty($_POST);
+
+	$misc->printTrail($_REQUEST['subject']);
+	$misc->printTitle($insert ? $lang['strinsertrow'] : $lang['streditrow']);
+	$misc->printMsg($msg);
+
+	if (($conf['autocomplete'] != 'disable')) {
+		$fksprops = $misc->getAutocompleteFKProperties($_REQUEST['table'], 'insert');
+		if ($fksprops !== false)
+			echo $fksprops['code'];
+	} else
+		$fksprops = false;
+
+	[$functions_by_category, $all_functions] = $formRenderer->prepareFieldFunctions();
+	$byteaInlineLimit = isset($conf['bytea_inline_limit']) ? (int) $conf['bytea_inline_limit'] : 1024 * 1024;
+	if ($byteaInlineLimit < 0) {
+		$byteaInlineLimit = 0;
+	}
+
+	$parseSize = function ($value) {
+		$unit = strtoupper(substr(trim($value), -1));
+		$number = (int) $value;
+		switch ($unit) {
+			case 'G':
+				return $number * 1024 * 1024 * 1024;
+			case 'M':
+				return $number * 1024 * 1024;
+			case 'K':
+				return $number * 1024;
+			default:
+				return (int) $value;
+		}
+	};
+
+	$byteaMaxUploadSize = isset($conf['bytea_max_upload_size']) ? (int) $conf['bytea_max_upload_size'] : 0;
+	if ($byteaMaxUploadSize <= 0) {
+		$uploadMax = $parseSize(ini_get('upload_max_filesize'));
+		$postMax = $parseSize(ini_get('post_max_size'));
+		$byteaMaxUploadSize = min($uploadMax, $postMax);
+	}
+
+	if ($rs && $rs->recordCount() > 1) {
+		$misc->printMsg($lang['strrownotunique']);
+		return;
+	}
+
+	$isValid = $attrs && $attrs->recordCount() > 0 &&
+		($insert || ($rs && $rs->recordCount() == 1));
+
+	if (!$isValid) {
+		$misc->printMsg($lang['strinvalidparam']);
+		return;
+	}
+
+	$typeNames = [];
+	if ($attrs && $attrs->recordCount() > 0) {
+		while (!$attrs->EOF) {
+			$typeNames[] = $attrs->fields['type'] ?? '';
+			$attrs->moveNext();
+		}
+		$attrs->moveFirst();
+	}
+	$typeActions = new TypeActions($pg);
+	$typeMetas = $typeActions->getTypeMetasByNames($typeNames);
+	//var_dump($typeNames);
+
+	echo "<form action=\"display.php\" method=\"post\" id=\"ac_form\" enctype=\"multipart/form-data\">\n";
+
+	echo "<table class=\"data\">\n";
+
+	// Output table header
+	echo "<tr>\n";
+	//echo "<th class=\"data\"></th>\n";
+	echo "<th class=\"data\">{$lang['strcolumn']}</th>\n";
+	echo "<th class=\"data\">{$lang['strtype']}</th>";
+	echo "<th class=\"data\">{$lang['strfunction']}</th>\n";
+	echo "<th class=\"data\">{$lang['strnull']}</th>\n";
+	echo "<th class=\"data\">{$lang['strvalue']}</th>\n";
+	echo "<th class=\"data\">{$lang['strexpr']}</th>\n";
+	echo "</tr>";
+
+	$i = 0;
+	while (!$attrs->EOF) {
+
+		$attrs->fields['attnotnull'] = $pg->phpBool($attrs->fields['attnotnull']);
+		$id = (($i & 1) == 0 ? '1' : '2');
+
+		// Initialise variables
+		//if (!isset($_REQUEST['format'][$attrs->fields['attname']]))
+		//	$_REQUEST['format'][$attrs->fields['attname']] = 'VALUE';
+
+		if ($initial) {
+			if ($insert) {
+				$value = $attrs->fields['adsrc'];
+				if (!empty($value)) {
+					$search = str_replace("()", " ()", strtoupper($value));
+					$function = $all_functions[$search] ?? null;
+					if (!empty($function)) {
+						// use function
+						$_REQUEST['format'][$attrs->fields['attname']] = $function;
+						$value = '';
+					} else {
+						// use expression
+						$_REQUEST['expr'][$attrs->fields['attname']] = 1;
+					}
+					//$_REQUEST['expr'][$attrs->fields['attname']] = 1;
+				}
+			} else {
+				$value = $rs->fields[$attrs->fields['attname']];
+			}
+		} else {
+			$value = $_REQUEST["values"][$attrs->fields['attname']];
+		}
+
+		echo "<tr class=\"data{$id}\">\n";
+		//echo "<td class=\"info\">#", $i+1, "</td>";
+		echo "<th>", htmlspecialchars($attrs->fields['attname']), "</th>";
+		echo "<td>\n";
+		echo htmlspecialchars($attrs->fields['type']);
+		//echo "<input type=\"hidden\" name=\"types[", htmlspecialchars($attrs->fields['attname']), "]\" value=\"", htmlspecialchars($attrs->fields['type']), "\" /></td>";
+		echo "<td>\n";
+		$formRenderer->printFieldFunctions(
+			"format[{$attrs->fields['attname']}]",
+			$_REQUEST['format'][$attrs->fields['attname']] ?? '',
+			[
+				'id' => "sel_fnc_" . htmlspecialchars($attrs->fields['attname'])
+			],
+		);
+		echo "</td>\n";
+		echo "<td class=\"text-center\">";
+		// Output null box if the column allows nulls (doesn't look at CHECKs or ASSERTIONS)
+		if (!$attrs->fields['attnotnull']) {
+			// Set initial null values
+			if ($initial && ($insert || $rs->fields[$attrs->fields['attname']] === null)) {
+				$_REQUEST['nulls'][$attrs->fields['attname']] = 'on';
+			}
+			$null_cb_id = "cb_null_" . htmlspecialchars($attrs->fields['attname']);
+			echo "<label><span><input type=\"checkbox\" name=\"nulls[{$attrs->fields['attname']}]\" id=\"$null_cb_id\"",
+				isset($_REQUEST['nulls'][$attrs->fields['attname']]) ? ' checked="checked"' : '', " /></span></label>\n";
+		} else {
+			echo "&nbsp;";
+			$null_cb_id = "";
+		}
+		echo "</td>\n";
+
+		echo "<td id=\"row_att_{$attrs->fields['attnum']}\">";
+
+		$extras = [
+			'data-field' => $attrs->fields['attname'],
+		];
+
+		//$extras['onChange'] = 'document.getElementById("' . $sel_fnc_id . '").value = "";';
+
+		// If the column allows nulls, then we put a JavaScript action on
+		// the data field to unset the NULL checkbox as soon as anything
+		// is entered in the field.
+		if (!$attrs->fields['attnotnull']) {
+			$extras['onChange'] = 'document.getElementById("' . $null_cb_id . '").checked = false;';
+		}
+
+		if (($fksprops !== false) && isset($fksprops['byfield'][$attrs->fields['attnum']])) {
+			$extras['id'] = "attr_{$attrs->fields['attnum']}";
+			$extras['autocomplete'] = 'off';
+			$extras['data-fk-context'] = 'insert';
+			$extras['data-attnum'] = $attrs->fields['attnum'];
+		}
+
+		$type = $attrs->fields['type'] ?? '';
+		$options = [
+			'is_large_type' => $typeActions->isLargeTypeMeta($typeMetas[$type]),
+		];
+		if (strpos($type, 'bytea') === 0) {
+			$downloadUrl = null;
+			if (!$insert && !empty($keyFields)) {
+				$params = [
+					'action' => 'downloadbytea',
+					'server' => $_REQUEST['server'],
+					'database' => $_REQUEST['database'],
+					'schema' => $schema,
+					'table' => $_REQUEST['table'],
+					'column' => $attrs->fields['attname'],
+					'key' => $keyFields,
+					'output' => 'download', // for frameset.js to detect
+				];
+				$downloadUrl = 'display.php?' . http_build_query($params);
+			}
+			$options += [
+				'is_insert' => $insert,
+				'size' => $byteaSizes[$attrs->fields['attname']] ?? null,
+				'limit' => $byteaInlineLimit,
+				'download_url' => $downloadUrl,
+				'max_upload_size' => $byteaMaxUploadSize,
+			];
+			if ($initial && !empty($value) && !str_starts_with($value, '\\x')) {
+				$value = '\\x' . bin2hex($value);
+			}
+		}
+
+		$formRenderer->printField(
+			"values[{$attrs->fields['attname']}]",
+			$value,
+			$attrs->fields['type'],
+			$extras,
+			$options
+		);
+
+		echo "</td>";
+		echo "<td class=\"text-center\">\n";
+		$expr_cb_id = "cb_expr_" . htmlspecialchars($attrs->fields['attname']);
+		echo "<label><span><input type=\"checkbox\" id=\"$expr_cb_id\" name=\"expr[{$attrs->fields['attname']}]\"",
+			!empty($_REQUEST['expr'][$attrs->fields['attname']]) ? ' checked="checked"' : '', " /></span></label>\n";
+		echo "</td>";
+		echo "</tr>\n";
+		$i++;
+		$attrs->moveNext();
+	}
+	echo "</table>\n";
+
+	echo "<input type=\"hidden\" name=\"action\" value=\"editrow\" />\n";
+	echo $misc->form;
+	if ($insert) {
+		if (!isset($_SESSION['counter']))
+			$_SESSION['counter'] = 0;
+		echo "<input type=\"hidden\" name=\"protection_counter\" value=\"" . $_SESSION['counter'] . "\" />\n";
+	} else {
+		foreach ($keyFields as $field => $val) {
+			echo "<input type=\"hidden\" name=\"key[", htmlspecialchars($field), "]\" value=\"", htmlspecialchars($val), "\" />\n";
+		}
+		//echo "<input type=\"hidden\" name=\"key\" value=\"", html_esc(urlencode(serialize($keyFields))), "\" />\n";
+	}
+	if (isset($_REQUEST['table']))
+		echo "<input type=\"hidden\" name=\"table\" value=\"", htmlspecialchars($_REQUEST['table']), "\" />\n";
+	if (isset($_REQUEST['subject']))
+		echo "<input type=\"hidden\" name=\"subject\" value=\"", htmlspecialchars($_REQUEST['subject']), "\" />\n";
+	if (isset($_REQUEST['query']))
+		echo "<input type=\"hidden\" name=\"query\" value=\"", htmlspecialchars($_REQUEST['query']), "\" />\n";
+	if (isset($_REQUEST['count']))
+		echo "<input type=\"hidden\" name=\"count\" value=\"", htmlspecialchars($_REQUEST['count']), "\" />\n";
+	if (isset($_REQUEST['return']))
+		echo "<input type=\"hidden\" name=\"return\" value=\"", htmlspecialchars($_REQUEST['return']), "\" />\n";
+	if (isset($_REQUEST['page']))
+		echo "<input type=\"hidden\" name=\"page\" value=\"", htmlspecialchars($_REQUEST['page']), "\" />\n";
+	if (isset($_REQUEST['orderby'])) {
+		foreach ($_REQUEST['orderby'] as $field => $val) {
+			echo "<input type=\"hidden\" name=\"orderby[", htmlspecialchars($field), "]\" value=\"", htmlspecialchars($val), "\" />\n";
+		}
+	}
+	if (isset($_REQUEST['strings']))
+		echo "<input type=\"hidden\" name=\"strings\" value=\"", htmlspecialchars($_REQUEST['strings']), "\" />\n";
+
+	echo "<p>";
+	if ($insert) {
+		echo "<input type=\"submit\" name=\"insert\" value=\"{$lang['strinsert']}\" />\n";
+		echo "<input type=\"submit\" name=\"insert_and_repeat\" accesskey=\"r\" value=\"{$lang['strinsertandrepeat']}\" />\n";
+	} else {
+		echo "<input type=\"submit\" name=\"save\" accesskey=\"r\" value=\"{$lang['strsave']}\" />\n";
+	}
+	echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" />\n";
+
+	if ($fksprops !== false) {
+		echo "&nbsp;&nbsp;&nbsp;";
+		if ($conf['autocomplete'] != 'default off')
+			echo "<input type=\"checkbox\" id=\"no_ac\" value=\"1\" checked=\"checked\" /> <label for=\"no_ac\"> {$lang['strac']}</label>\n";
+		else
+			echo "<input type=\"checkbox\" id=\"no_ac\" value=\"0\" /> <label for=\"no_ac\"> {$lang['strac']}</label>\n";
+	}
+
+	echo "</p>\n";
+	echo "</form>\n";
 }
 
 /**
@@ -827,6 +849,7 @@ function popupEdit()
 	$pg = AppContainer::getPostgres();
 	$tableActions = new TableActions($pg);
 	$schemaActions = new SchemaActions($pg);
+	$typeActions = new TypeActions($pg);
 	$formRenderer = new FormRenderer();
 	$lang = AppContainer::getLang();
 
@@ -874,11 +897,17 @@ function popupEdit()
 	$type = $fieldInfo['type'] ?? 'text';
 
 	// Check type blacklist (bytea and array types)
-	if (strpos($type, 'bytea') === 0 || strpos($type, '_') === 0) {
+	if (strpos($type, 'bytea') === 0) {
 		header('HTTP/1.0 400 Bad Request');
 		echo 'Field type not supported for inline editing';
 		exit;
 	}
+
+	$metas = $typeActions->getTypeMetasByNames([$type]);
+	var_dump($metas[$type]);
+	$isLargeType = isset($metas[$type])
+		? $typeActions->isLargeTypeMeta($metas[$type])
+		: true;
 
 	// Fetch actual field value from database using keys
 	$whereParts = [];
@@ -919,7 +948,10 @@ function popupEdit()
 
 	echo '<div class="popup-field-editor p-2">';
 	echo '<div class="popup-field-label mb-1">' . htmlspecialchars($field) . '</div>';
-	$formRenderer->printField('value', $value, $type, $extras, null);
+	$options = [
+		'is_large_type' => $isLargeType,
+	];
+	$formRenderer->printField('value', $value, $type, $extras, $options);
 
 	$nullChecked = isset($value) ? '' : ' checked';
 	echo '<div class="popup-field-options">';
@@ -931,7 +963,9 @@ function popupEdit()
 			'class' => 'my-2'
 		],
 	);
-	echo "<label class=\"mr-2\"><input type=\"checkbox\" name=\"_isnull\" id=\"popup-null-cb\" class=\"mr-1\"{$nullChecked}>" . htmlspecialchars($lang['strnull']) . "</label> ";
+	if (!$pg->phpBool($fieldInfo['attnotnull'])) {
+		echo "<label class=\"mr-2\"><input type=\"checkbox\" name=\"_isnull\" id=\"popup-null-cb\" class=\"mr-1\"{$nullChecked}>" . htmlspecialchars($lang['strnull']) . "</label> ";
+	}
 	echo '<label><input type="checkbox" name="_isexpr" id="popup-expr-cb" class="mr-1"> ' . htmlspecialchars($lang['strexpression']) . '</label>';
 	echo '</div>';
 	echo '</div>';

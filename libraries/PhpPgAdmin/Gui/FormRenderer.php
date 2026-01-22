@@ -47,8 +47,9 @@ class FormRenderer extends AppContext
 	 * @param string $value The value of the field.  Note this could be 'numeric(7,2)' sort of thing...
 	 * @param string $type The database type of the field
 	 * @param array $extras An array of attributes name as key and attributes' values as value
+	 * @param array $options An array of options for special types (like bytea)
 	 */
-	function printField($name, $value, $type, $extras = [], $options = null)
+	function printField($name, $value, $type, $extras = [], $options = [])
 	{
 		$lang = $this->lang();
 
@@ -109,7 +110,6 @@ class FormRenderer extends AppContext
 				}
 				break;
 			case 'bytea':
-			case 'bytea[]':
 				$byteaLimit = $options['limit'] ?? 0;
 				$byteaSize = $options['size'] ?? null;
 				$isInsert = !empty($options['is_insert']);
@@ -157,15 +157,13 @@ class FormRenderer extends AppContext
 			case 'jsonb':
 			case 'xml':
 			case 'character':
-				$n = substr_count($value ?? '', "\n");
-				$n = $n < 5 ? 5 : $n;
-				$n = $n > 20 ? 20 : $n;
-				echo "<textarea name=\"", htmlspecialchars($name), "\" rows=\"{$n}\" cols=\"75\"{$extra_str}>\n";
+			case 'character varying':
+				echo "<textarea name=\"", htmlspecialchars($name), "\" rows=\"5\" cols=\"75\"{$extra_str}>\n";
 				echo htmlspecialchars($value ?? '');
 				echo "</textarea>\n";
 				break;
 			default:
-				if (str_ends_with($base_type, '[]')) {
+				if (str_ends_with($base_type, '[]') || !empty($options['is_large_type'])) {
 					echo "<textarea name=\"", htmlspecialchars($name), "\" rows=\"5\" cols=\"75\"{$extra_str}>\n";
 					echo htmlspecialchars($value ?? '');
 					echo "</textarea>\n";
@@ -220,6 +218,8 @@ EOT;
 	 */
 	function printFieldFunctions($name, $value, $extras = [])
 	{
+		$lang = $this->lang();
+
 		[$functions_by_category] = $this->prepareFieldFunctions();
 		$extra_str = '';
 		foreach ($extras as $k => $v) {
@@ -227,7 +227,7 @@ EOT;
 		}
 
 		echo "<select $extra_str name=\"", htmlspecialchars($name), "\">\n";
-		echo "<option></option>\n";
+		echo "<option value=\"\" class=\"placeholder\">", htmlspecialchars($lang['strchoosefunction']), "</option>\n";
 		foreach ($functions_by_category as $category => $functions) {
 			echo "<optgroup label=\"", htmlspecialchars($category), "\">\n";
 			foreach ($functions as $function) {

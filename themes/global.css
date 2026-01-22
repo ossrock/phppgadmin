@@ -836,3 +836,7 @@ td.editable.active {
 th.large_type {
 	min-width: 100px;
 }
+
+option.placeholder {
+	color: #888;
+}
