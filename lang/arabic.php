@@ -9,7 +9,7 @@
 
 // Language and character set
 $lang['applang'] = 'عربي';
-$lang['applocale'] = 'ar';
+$lang['applocale'] = 'ar-EG';
 $lang['applangdir'] = 'rtl';
 
 // Welcome

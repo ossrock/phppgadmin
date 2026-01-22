@@ -904,10 +904,10 @@ function popupEdit()
 	}
 
 	$metas = $typeActions->getTypeMetasByNames([$type]);
-	var_dump($metas[$type]);
+	//var_dump($metas[$type]);
 	$isLargeType = isset($metas[$type])
 		? $typeActions->isLargeTypeMeta($metas[$type])
-		: true;
+		: false;
 
 	// Fetch actual field value from database using keys
 	$whereParts = [];

@@ -34,9 +34,11 @@
 	margin: 0;
 }
 
+/*
 html[dir="rtl"] #frameset {
 	flex-direction: row-reverse;
 }
+*/
 
 #tree {
 	width: 250px;

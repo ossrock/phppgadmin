@@ -223,6 +223,9 @@ class Misc extends AppContext
 			$postgres->execute("SET standard_conforming_strings = on");
 		}
 
+		$locale = $lang['applocale'] . '.UTF-8';
+		$postgres->execute("SET lc_messages = '$locale'");
+
 		//if ($postgres->hasByteaHexDefault()) {
 		//	$postgres->execute("SET bytea_output TO escape");
 		//}

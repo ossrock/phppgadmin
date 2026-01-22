@@ -332,6 +332,7 @@ if (empty($_ENV["SKIP_DB_CONNECTION"] ?? '')) {
 	 * The enhanced driver provides methods like FieldTableOID($i) and FieldAttnum($i)
 	 * on result sets for direct field source metadata inspection.
 	 */
+	/*
 	$ADODB_NEWCONNECTION = function ($dbType) {
 		if ($dbType !== 'postgres9_enhanced') {
 			// Not our driver, let ADODB handle it with default loading
@@ -362,6 +363,7 @@ if (empty($_ENV["SKIP_DB_CONNECTION"] ?? '')) {
 			die("failed to load driver: " . $e->getMessage());
 		}
 	};
+	*/
 
 	if (!isset($_REQUEST['server'])) {
 		echo $lang['strnoserversupplied'];
