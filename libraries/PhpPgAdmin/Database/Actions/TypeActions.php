@@ -273,6 +273,9 @@ class TypeActions extends AppActions
 
     public function isLargeTypeMeta($meta)
     {
+        if (!is_array($meta)) {
+            return false;
+        }
         // Arrays are always varlena
         if (
             $meta['typelem'] != '0' &&
@@ -293,6 +296,14 @@ class TypeActions extends AppActions
 
         // all other → small
         return false;
+    }
+
+    public function isArrayType($meta)
+    {
+        if (!is_array($meta)) {
+            return false;
+        }
+        return $meta['typelem'] != '0' && $meta['typinput'] === 'array_in';
     }
 
 

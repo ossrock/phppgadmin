@@ -535,6 +535,11 @@ pre.error {
 	font-size: 120%;
 }
 
+.nowrap pre,
+.no-wrap pre {
+	white-space: pre;
+}
+
 .intro li {
 	font-weight: bold;
 }

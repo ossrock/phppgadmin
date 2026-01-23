@@ -3,6 +3,7 @@
 namespace PhpPgAdmin\Database;
 
 use ADORecordSet;
+use ADORecordSet_empty;
 
 /**
  * Unified wrapper for query results from both ADODB and raw pg_* calls
@@ -21,7 +22,7 @@ class QueryResult
     public static function fromADORecordSet($recordSet, $errorMsg = '')
     {
         $result = new self();
-        $result->adoRecordSet = $recordSet;
+        $result->adoRecordSet = $recordSet ?: new ADORecordSet_empty();
         $result->isSuccess = $recordSet !== false;
         $result->errorMsg = $errorMsg;
         return $result;

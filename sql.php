@@ -1,20 +1,19 @@
 <?php
 
 use PhpPgAdmin\Core\AppContainer;
+use PhpPgAdmin\Database\Import\SqlParser;
+use PhpPgAdmin\Database\QueryResult;
+use PhpPgAdmin\Database\Actions\TypeActions;
 use PhpPgAdmin\Database\Actions\SchemaActions;
 use PhpPgAdmin\Database\Actions\ScriptActions;
-use PhpPgAdmin\Database\QueryResult;
 
 /**
- * Process an arbitrary SQL query - tricky!  The main problem is that
- * unless we implement a full SQL parser, there's no way of knowing
- * how many SQL statements have been strung together with semi-colons
- * @param $_SESSION['sqlquery'] The SQL query string to execute
+ * Process an arbitrary SQL script of statements!  
  *
  * $Id: sql.php,v 1.43 2008/01/10 20:19:27 xzilla Exp $
  */
 
-// Prevent timeouts on large exports (non-safe mode only)
+// Prevent timeouts on large scripts (non-safe mode only)
 if (!ini_get('safe_mode'))
 	set_time_limit(0);
 
@@ -25,50 +24,101 @@ include_once('./libraries/bootstrap.php');
  * Render query results to HTML
  * @param QueryResult $result The wrapped query result
  * @param string $query The SQL query that was executed
+ * @param string|null $lineInfo Optional line info for error reporting
  */
-function renderQueryResult($result, $query)
+function renderQueryResult($result, $query, $lineInfo = null)
 {
 	$misc = AppContainer::getMisc();
 	$lang = AppContainer::getLang();
+	$pg = AppContainer::getPostgres();
 
+	/*
 	if (!$result->isSuccess) {
 		echo nl2br(html_esc($result->errorMsg)), "<br/>\n";
 		return;
 	}
+	*/
 
 	// Get ADODB-compatible adapter (handles both ADODB and pg_* results)
 	$rs = $result->getAdapterForResults();
 
-	if ($rs === null) {
+	echo "<div class=\"query-box mb-2\">\n";
+	echo "<pre class=\"sql-viewer\">" . htmlspecialchars($query) . "</pre>\n";
+	if (!$result->isSuccess) {
+		echo "<div class=\"error\">", nl2br(html_esc($result->errorMsg)), "</div>\n";
+	}
+	echo "<div class=\"query-stats\">\n";
+	if ($lineInfo !== null) {
+		echo "<span class=\"mr-1\">", html_esc($lineInfo), ",</span>";
+	}
+	if ($result->affectedRows() > 0) {
+		echo $result->affectedRows(), " {$lang['strrowsaff']}\n";
+	} else {
+		echo $result->recordCount(), " {$lang['strrows']}\n";
+	}
+	echo "</div>\n";
+	echo "</div>\n";
+
+	if (!$result->isSuccess || $rs === null || $result->recordCount() <= 0) {
 		return;
 	}
 
-	if ($result->recordCount() > 0) {
-		echo "<p><table>\n<tr>";
+	$pg->conn->SetFetchMode(ADODB_FETCH_ASSOC);
+
+	$typeNames = [];
+	for ($i = 0; $i < $rs->fieldCount(); $i++) {
+		$finfo = $rs->fetchField($i);
+		$typeNames[] = $finfo->type;
+	}
+	$typeActions = new TypeActions($pg);
+	$typesMeta = $typeActions->getTypeMetasByNames($typeNames);
+
+	echo "<table class=\"data query-result mb-1\">\n";
+	echo "<colgroup>\n";
+	foreach ($rs->fields as $k => $v) {
+		$finfo = $rs->fetchField($k);
+		echo "<col class=\"{$finfo->type}\" />\n";
+	}
+	echo "</colgroup>\n";
+	echo "<thead class=\"sticky-thead\">\n";
+	echo "<tr>\n";
+	foreach ($rs->fields as $k => $v) {
+		$finfo = $rs->fetchField($k);
+		$typeMeta = $typesMeta[$finfo->type] ?? null;
+		$isLargeType = $typeMeta !== null && $typeActions->isLargeTypeMeta($typeMeta);
+		$class = 'data';
+		if ($isLargeType) {
+			$class .= ' large_type';
+		}
+		echo "<th class=\"{$class}\">", $misc->printVal($finfo->name), "</th>\n";
+	}
+	echo "</tr>\n";
+	echo "</thead>\n";
+	echo "<tbody>\n";
+	$i = 0;
+	while (!$rs->EOF) {
+		$id = (($i & 1) == 0 ? '1' : '2');
+		echo "<tr class=\"data{$id} data-row\">\n";
 		foreach ($rs->fields as $k => $v) {
 			$finfo = $rs->fetchField($k);
-			echo "<th class=\"data\">", $misc->printVal($finfo->name), "</th>";
+			$typeMeta = $typesMeta[$finfo->type] ?? null;
+			$isArray = substr_compare($finfo->type, '_', 0, 1) === 0;
+			$array = $isArray ? "array" : "no-array";
+			$hasLineBreak = isset($v) && str_contains($v, "\n");
+			$lineBreak = $hasLineBreak ? "line-break" : "no-line-break";
+			echo "<td class=\"auto-wrap field $finfo->type $array $lineBreak\">";
+			echo "<div class=\"$finfo->type wrapper\">";
+			echo $misc->printVal($v, $finfo->type, array('null' => true));
+			echo "</div>";
+			echo "</td>\n";
 		}
 		echo "</tr>\n";
-		$i = 0;
-		while (!$rs->EOF) {
-			$id = (($i % 2) == 0 ? '1' : '2');
-			echo "<tr class=\"data{$id}\">\n";
-			foreach ($rs->fields as $k => $v) {
-				$finfo = $rs->fetchField($k);
-				echo "<td style=\"white-space:nowrap;\">", $misc->printVal($v, $finfo->type, array('null' => true)), "</td>";
-			}
-			echo "</tr>\n";
-			$rs->moveNext();
-			$i++;
-		}
-		echo "</table></p>\n";
-		echo "<p>", $i, " {$lang['strrows']}</p>\n";
-	} elseif ($result->affectedRows() > 0) {
-		echo "<p>", $result->affectedRows(), " {$lang['strrowsaff']}</p>\n";
-	} else {
-		echo '<p>', $lang['strnodata'], "</p>\n";
+		$rs->moveNext();
+		$i++;
 	}
+	echo "</tbody>\n";
+	echo "</table>\n";
+	//echo "<p>", $i, " {$lang['strrows']}</p>\n";
 }
 
 /**
@@ -77,37 +127,15 @@ function renderQueryResult($result, $query)
  * @param QueryResult $result The wrapped query result from script executor
  * @param int $lineno The line number in the script file
  */
-function sqlCallback($query, $result, $lineno)
-{
-	//global $_connection;
-	$pg = AppContainer::getPostgres();
-	$lang = AppContainer::getLang();
-
-	// Display query info header
-	echo "Line {$lineno}: ";
-
-	if (!$result->isSuccess) {
-		echo html_esc($_FILES['script']['name']), ':', $lineno, ': ', nl2br(html_esc($result->errorMsg)), "<br/>\n";
-	} else {
-		// Render the result
-		renderQueryResult($result, $query);
-	}
-}
+$sqlCallback = function ($query, $result, $lineno) {
+	$lineInfo = $_FILES['script']['name'] . ':' . $lineno;
+	renderQueryResult($result, $query, $lineInfo);
+};
 
 $lang = AppContainer::getLang();
 $misc = AppContainer::getMisc();
 $pg = AppContainer::getPostgres();
 $schemaActions = new SchemaActions($pg);
-
-/*
-sample $_REQUEST contents:
-  'query' => string 'SELECT * FROM "public"."actor_info"' (length=35)
-  'MAX_FILE_SIZE' => string '2097152' (length=7)
-  'target' => string 'content' (length=7)
-  'server' => string '127.0.0.1:5432:allow' (length=20)
-  'database' => string '' (length=0)
-  'search_path' => string 'public' (length=6)
-*/
 
 $subject = $_REQUEST['subject'] ?? '';
 
@@ -121,10 +149,30 @@ if ($subject == 'history') {
 	$_SESSION['sqlquery'] = $_REQUEST['query'];
 } else {
 	echo "could not find the query!!";
+	exit;
 }
 
 $isUpload = isset($_FILES['script']) && $_FILES['script']['size'] > 0;
-$isReadQuery = !$isUpload && isSqlReadQuery($_SESSION['sqlquery']);
+$canPaginate = !$isUpload;
+$hasNonReadQueries = $isUpload;
+if (!$isUpload) {
+	$script = trim($_SESSION['sqlquery']);
+	if (substr($script, -1) !== ';') {
+		$script .= ';';
+	}
+	$result = SqlParser::parseFromString($script);
+	$statements = $result['statements'];
+	$readQueryCount = 0;
+	foreach ($statements as $stmt) {
+		if (isSqlReadQuery($stmt, false)) {
+			$readQueryCount++;
+		} else {
+			$hasNonReadQueries = true;
+		}
+	}
+	$canPaginate = ($readQueryCount === 1);
+}
+//$isReadQuery = !$isUpload && isSqlReadQuery($_SESSION['sqlquery']);
 
 // Pagination maybe set by a get link that has it as FALSE,
 // if that's the case, unset the variable.
@@ -141,7 +189,7 @@ if ($isUpload) {
 	$paginate = 'f';
 }
 if (empty($paginate)) {
-	$paginate = $isReadQuery ? 't' : 'f';
+	$paginate = $canPaginate ? 't' : 'f';
 }
 
 // Check to see if pagination has been specified. In that case, send to display
@@ -171,26 +219,27 @@ $start_time = microtime(true);
 if ($isUpload) {
 	// Execute the script via our ScriptActions class
 	$scriptActions = new ScriptActions($pg);
-	$scriptActions->executeScript('script', 'sqlCallback');
+	$scriptActions->executeScript('script', $sqlCallback);
 } else {
-	// Set fetch mode to NUM so that duplicate field names are properly returned
-	$pg->conn->setFetchMode(ADODB_FETCH_NUM);
-	$rs = $pg->conn->Execute($_SESSION['sqlquery']);
-	$errorMsg = '';
+	// Execute each individual statement
+	foreach ($statements as $stmt) {
+		// Set fetch mode to NUM so that duplicate field names are properly returned
+		$pg->conn->setFetchMode(ADODB_FETCH_NUM);
+		$rs = $pg->conn->Execute($stmt);
+		$errorMsg = $rs === false ? $pg->conn->ErrorMsg() : '';
 
-	if ($rs === false) {
-		$errorMsg = $pg->conn->ErrorMsg();
+		// Wrap result for consistent handling
+		$result = QueryResult::fromADORecordSet($rs, $errorMsg);
+
+		// Render the result
+		renderQueryResult($result, $stmt);
 	}
 
-	// Wrap result for consistent handling
-	$result = QueryResult::fromADORecordSet($rs, $errorMsg);
-
 	// Request was run, saving it in history
-	if ($rs !== false && !isset($_REQUEST['nohistory']))
+	if (!isset($_REQUEST['nohistory'])) {
 		$misc->saveSqlHistory($_SESSION['sqlquery'], false);
+	}
 
-	// Render the result
-	renderQueryResult($result, $_SESSION['sqlquery']);
 }
 
 // May as well try to time the query
@@ -198,7 +247,7 @@ $end_time = microtime(true);
 $duration = number_format(($end_time - $start_time) * 1000, 3);
 
 // Reload the tree as we may have made schema changes
-if (!$isReadQuery) {
+if ($hasNonReadQueries) {
 	AppContainer::setShouldReloadTree(true);
 }
 

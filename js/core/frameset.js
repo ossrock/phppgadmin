@@ -479,12 +479,14 @@ function frameSetHandler(postCacheDB) {
 		const headerHeight = stickyHeader.getBoundingClientRect().height;
 
 		// Get sticky table header if exists
-		const stickyTableHead = content.querySelector("#sticky-thead");
-		if (stickyTableHead) {
+		const stickyTableHeads = content.querySelectorAll("thead.sticky-thead");
+		if (stickyTableHeads.length > 0) {
 			// Set top dynamically (px)
-			stickyTableHead.querySelectorAll("th").forEach((th) => {
-				th.style.position = "sticky";
-				th.style.top = headerHeight + "px";
+			stickyTableHeads.forEach((thead) => {
+				thead.querySelectorAll("th").forEach((th) => {
+					th.style.position = "sticky";
+					th.style.top = headerHeight + "px";
+				});
 			});
 		}
 	}

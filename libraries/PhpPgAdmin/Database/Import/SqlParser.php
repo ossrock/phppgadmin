@@ -217,10 +217,11 @@ class SqlParser
             $j++;
         }
 
-        // Partial: we only make progress if we flushed at least one statement, or we have tuples
-        // that we know are followed by ',' (tailPos is set).
+        // Partial: we only make progress if we flushed at least one statement,
+        // or we have tuples that we know are followed by ',' (tailPos is set).
         if (!empty($batch)) {
-            // Only flush if we know we can safely advance (tailPos indicates a comma after last tuple).
+            // Only flush if we know we can safely advance (tailPos indicates
+            // a comma after last tuple).
             if ($tailPos !== null) {
                 $flush(false);
             }
@@ -238,7 +239,8 @@ class SqlParser
     }
 
     /**
-     * Skip whitespace, comments, and psql meta-commands (\\... lines) starting at $pos.
+     * Skip whitespace, comments, and psql meta-commands (\\... lines)
+     * starting at $pos.
      * Returns the next position where a real SQL token may begin.
      */
     private static function skipNoise(string $buf, int $pos, int $len, ?array &$meta = null): int

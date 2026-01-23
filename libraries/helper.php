@@ -296,9 +296,15 @@ function extractSqlQueries($sql)
  * @param string $sql
  * @return bool
  */
-function isSqlReadQuery($sql)
+function isSqlReadQuery($sql, $doExtract = true): bool
 {
-	$statements = extractSqlQueries($sql);
+	if ($doExtract) {
+		$statements = extractSqlQueries($sql);
+	} elseif (!empty($sql)) {
+		$statements = [$sql];
+	} else {
+		$statements = [];
+	}
 	if (count($statements) === 0) {
 		return false;
 	}

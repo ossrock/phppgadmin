@@ -3,6 +3,8 @@
 namespace PhpPgAdmin\Gui;
 
 use PhpPgAdmin\Database\Actions\TypeActions;
+use PhpPgAdmin\Database\Import\SqlParser;
+use PhpPgAdmin\Database\Postgres;
 use PHPSQLParser\PHPSQLParser;
 use PhpPgAdmin\Core\AppContainer;
 use PhpPgAdmin\Core\AppContext;
@@ -356,7 +358,7 @@ class RowBrowserRenderer extends AppContext
         }
     }
 
-    private function executeNonUpdateQuery($query, $save_history)
+    private function executeNonReadQuery($query, $save_history)
     {
         $pg = AppContainer::getPostgres();
         $misc = AppContainer::getMisc();
@@ -364,12 +366,11 @@ class RowBrowserRenderer extends AppContext
 
         $query = trim($query);
         $succeded = $pg->execute($query) === 0;
-        if ($save_history) {
+        if ($save_history && $succeded) {
             $misc->saveSqlHistory($query, false);
         }
 
         echo "<div class=\"query-box mb-2\">\n";
-
         ?>
         <pre class="p-2 sql-viewer"><?= htmlspecialchars($query) ?></pre>
         <?php if (!$succeded): ?>
@@ -519,45 +520,12 @@ class RowBrowserRenderer extends AppContext
         return [$actions, $edit_params, $delete_params, $colspan];
     }
 
-    private function buildBrowseNavLinks($type, $table_name, $subject, array $_gets, $rs, array $fields, array $lang): array
+    private function buildBrowseNavLinks($table_name, $subject, array $_gets, $rs, array $fields, array $lang): array
     {
         $misc = AppContainer::getMisc();
 
         // Navigation links
         $navlinks = [];
-
-        // Return
-        if (isset($_REQUEST['return'])) {
-            $urlvars = $misc->getSubjectParams($_REQUEST['return']);
-
-            $navlinks['back'] = [
-                'attr' => [
-                    'href' => [
-                        'url' => $urlvars['url'],
-                        'urlvars' => $urlvars['params']
-                    ]
-                ],
-                'icon' => $misc->icon('Return'),
-                'content' => $lang['strback']
-            ];
-        }
-
-        // Edit SQL link
-        if ($type == 'QUERY') {
-            $navlinks['edit'] = [
-                'attr' => [
-                    'href' => [
-                        'url' => 'database.php',
-                        'urlvars' => array_merge($fields, [
-                            'action' => 'sql',
-                            'paginate' => 'on',
-                        ])
-                    ]
-                ],
-                'icon' => $misc->icon('Edit'),
-                'content' => $lang['streditsql']
-            ];
-        }
 
         // Expand/Collapse
         if ($_REQUEST['strings'] == 'expanded') {
@@ -595,6 +563,38 @@ class RowBrowserRenderer extends AppContext
                 'content' => $lang['strexpand']
             ];
         }
+
+        // Return
+        if (isset($_REQUEST['return'])) {
+            $urlvars = $misc->getSubjectParams($_REQUEST['return']);
+
+            $navlinks['back'] = [
+                'attr' => [
+                    'href' => [
+                        'url' => $urlvars['url'],
+                        'urlvars' => $urlvars['params']
+                    ]
+                ],
+                'icon' => $misc->icon('Return'),
+                'content' => $lang['strback']
+            ];
+        }
+
+        // Edit SQL link
+        $navlinks['edit'] = [
+            'attr' => [
+                'href' => [
+                    'url' => 'database.php',
+                    'urlvars' => array_merge($fields, [
+                        'action' => 'sql',
+                        'paginate' => 't',
+                    ])
+                ]
+            ],
+            'icon' => $misc->icon('Edit'),
+            'content' => $lang['streditsql']
+        ];
+
 
         // Create view and download
         if (isset($_REQUEST['query']) && is_object($rs) && $rs->recordCount() > 0) {
@@ -686,8 +686,6 @@ class RowBrowserRenderer extends AppContext
         $schemaActions = new SchemaActions($pg);
         $plugin_manager = AppContainer::getPluginManager();
 
-        $save_history = !isset($_REQUEST['nohistory']);
-
         $parser = new PHPSQLParser();
         if (
             !$this->prepareBrowseRequest(
@@ -699,17 +697,12 @@ class RowBrowserRenderer extends AppContext
                 $parser,
                 $subject,
                 $table_name,
-                $type,
                 $query,
                 $parsed,
                 $key_fields_early
             )
         ) {
             return;
-        }
-
-        if ($type == 'QUERY' && !empty($table) && !empty($schema)) {
-            $type = 'SELECT';
         }
 
         $misc->printTrail($subject ?? 'database');
@@ -731,7 +724,7 @@ class RowBrowserRenderer extends AppContext
 
         // Retrieve page from query.  $max_pages is returned by reference.
         $rs = $rowActions->browseQuery(
-            $type,
+            'SELECT',
             $table_name ?? null,
             $execQuery,
             $orderBySet ? [] : $_REQUEST['orderby'],
@@ -754,11 +747,6 @@ class RowBrowserRenderer extends AppContext
 
         // Build strings for GETs in array
         $_gets = $this->buildBrowseGets($subject, $table_name, $conf);
-
-        // Save query to history if required
-        if ($save_history) {
-            $misc->saveSqlHistory($query, true);
-        }
 
         $_sub_params = $_gets;
         unset($_sub_params['query']);
@@ -795,7 +783,7 @@ class RowBrowserRenderer extends AppContext
             }
 
             echo "<table id=\"data\" class=\"query-result\"{$table_data}>\n";
-            echo "<thead id=\"sticky-thead\">\n";
+            echo "<thead class=\"sticky-thead\">\n";
             echo "<tr data-orderby-desc=\"", htmlspecialchars($lang['strorderbyhelp']), "\">\n";
 
             //var_dump($key_fields);
@@ -925,7 +913,7 @@ class RowBrowserRenderer extends AppContext
             $fields['schema'] = $_REQUEST['schema'];
         }
 
-        $navlinks = $this->buildBrowseNavLinks($type, $table_name ?? null, $subject ?? null, $_gets, $rs, $fields, $lang);
+        $navlinks = $this->buildBrowseNavLinks($table_name ?? null, $subject ?? null, $_gets, $rs, $fields, $lang);
 
         $misc->printNavLinks($navlinks, 'display-browse', get_defined_vars());
 
@@ -934,7 +922,7 @@ class RowBrowserRenderer extends AppContext
     }
 
     private function prepareBrowseRequest(
-        $pg,
+        Postgres $pg,
         $conf,
         TableActions $tableActions,
         RowActions $rowActions,
@@ -942,11 +930,12 @@ class RowBrowserRenderer extends AppContext
         PHPSQLParser $parser,
         &$subject,
         &$table_name,
-        &$type,
         &$query,
         &$parsed,
         &$key_fields_early
     ): bool {
+        $misc = AppContainer::getMisc();
+
         if (!isset($_REQUEST['schema']))
             $_REQUEST['schema'] = $pg->_schema;
 
@@ -972,31 +961,44 @@ class RowBrowserRenderer extends AppContext
         $subject = $_REQUEST['subject'] ?? '';
         $table_name = $_REQUEST['table'] ?? $_REQUEST['view'] ?? null;
 
-        if (!empty($_REQUEST['query']) && !isSqlReadQuery($_REQUEST['query'])) {
-            $this->executeNonUpdateQuery($_REQUEST['query'], !isset($_REQUEST['nohistory']));
-            $_REQUEST['query'] = $_SESSION['sqlquery'] ?? '';
-        }
-
-        if (isset($table_name)) {
-            $type = isset($_REQUEST['query']) ? 'SELECT' : 'TABLE';
-        } else {
-            if (empty($_REQUEST['query'])) {
-                $_REQUEST['query'] = $_SESSION['sqlquery'] ?? '';
-            }
-            $type = 'QUERY';
-        }
-
+        $hasReadQuery = false;
         if (!empty($_REQUEST['query'])) {
-            $query = $_REQUEST['query'];
-            $parse_table = true;
-        } else {
-            $parse_table = false;
-            $query = "SELECT * FROM " . $pg->escapeIdentifier($_REQUEST['schema']);
-            if ($_REQUEST['subject'] == 'view') {
-                $query .= "." . $pg->escapeIdentifier($_REQUEST['view']) . ";";
-            } else {
-                $query .= "." . $pg->escapeIdentifier($_REQUEST['table']) . ";";
+            $query = trim($_REQUEST['query']);
+            if (!str_ends_with($query, ';')) {
+                $query .= ';';
             }
+            $result = SqlParser::parseFromString($query);
+            foreach ($result['statements'] as $stmt) {
+                if (isSqlReadQuery($stmt, false)) {
+                    // Stop at the first read query
+                    $query = $stmt;
+                    $hasReadQuery = true;
+                    break;
+                } else {
+                    // Execute non-read query
+                    $this->executeNonReadQuery($stmt, false);
+                }
+            }
+        } else {
+            $hasReadQuery = isset($table_name) || !empty($_REQUEST['query']);
+        }
+
+        if (!$hasReadQuery) {
+            // If there were no read queries, use last executed query from session
+            $query = $_REQUEST['query'] = $_SESSION['sqlquery'] ?? '';
+        }
+
+        if (empty($_REQUEST['query']) && $table_name) {
+            $parse_table = false;
+            $query = "SELECT * FROM " .
+                $pg->quoteIdentifier($_REQUEST['schema']) . "." . $pg->quoteIdentifier($table_name) . ";";
+        } else {
+            $parse_table = true;
+        }
+
+        // Save query to history if required
+        if (!isset($_REQUEST['nohistory'])) {
+            $misc->saveSqlHistory($query, true);
         }
 
         $parsed = $parser->parse($query);
@@ -1014,14 +1016,12 @@ class RowBrowserRenderer extends AppContext
                     if (empty($schema)) {
                         $schema = $tableActions->findTableSchema($table) ?? '';
                         if (!empty($schema)) {
-                            $misc = AppContainer::getMisc();
                             $misc->setCurrentSchema($schema);
                         }
                     }
                     $changed = $table_name != $table && !empty($schema);
                 }
                 if ($changed) {
-                    $misc = AppContainer::getMisc();
                     $misc->setCurrentSchema($schema);
                     $table_name = $table;
                     unset($_REQUEST[$subject]);

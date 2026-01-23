@@ -81,7 +81,7 @@ html[dir="rtl"] #frameset {
 	padding-bottom: 1px;
 }
 
-thead#sticky-thead th {
+thead.sticky-thead th {
 	position: sticky;
 	z-index: 5;
 }
@@ -773,18 +773,20 @@ pre code.hljs {
 .query-box pre {
 	white-space: pre-wrap;
 	word-break: break-word;
-	border-bottom: 1px solid #d1d1d1;
+	max-height: 200px;
+	overflow: auto;
 }
 
 .query-box .query-stats {
 	color: #757575;
 	font-style: italic;
+	border-top: 1px solid #d1d1d1;
 }
 
 .query-box .error {
 	color: #d32f2f;
 	font-weight: bold;
-	border-bottom: 1px solid #d1d1d1;
+	border-top: 1px solid #d1d1d1;
 }
 
 /* Popup Field Editor */
@@ -835,10 +837,30 @@ td.editable.active {
 	outline: 1px solid #1890ff;
 }
 
+option.placeholder {
+	color: #888;
+}
+
 th.large_type {
 	min-width: 100px;
 }
 
-option.placeholder {
-	color: #888;
+td.auto-wrap pre {
+	white-space: pre;
+}
+
+td.auto-wrap .wrapper {
+	max-width: 1000px;
+	max-height: 500px;
+	overflow: auto;
+}
+
+td.auto-wrap.no-line-break .wrapper {
+	display: block ruby;
+}
+
+td.auto-wrap.no-line-break pre {
+	white-space: pre-wrap;
+	word-break: break-word;
+	overflow-wrap: anywhere;
 }
