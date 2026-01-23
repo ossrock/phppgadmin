@@ -29,11 +29,13 @@ class TopbarRenderer extends AppContext
 
         if ($server_info && isset($server_info['platform']) && isset($server_info['username'])) {
             /* top left information when connected */
-            echo sprintf($lang['strtopbar'],
+            echo sprintf(
+                $lang['strtopbar'],
                 '<span class="platform">' . htmlspecialchars($server_info['platform']) . '</span>',
                 '<span class="host">' . htmlspecialchars((empty($server_info['host'])) ? 'localhost' : $server_info['host']) . '</span>',
                 '<span class="port">' . htmlspecialchars($server_info['port']) . '</span>',
-                '<span class="username">' . htmlspecialchars($server_info['username']) . '</span>');
+                '<span class="username">' . htmlspecialchars($server_info['username']) . '</span>'
+            );
 
             echo "</td>";
 
@@ -46,38 +48,38 @@ class TopbarRenderer extends AppContext
                             'url' => 'sqledit.php',
                             'urlvars' => array_merge($reqvars, [
                                 'action' => 'sql'
-									 ])
-								],
+                            ])
+                        ],
                         'target' => "sqledit",
                         'id' => 'toplink_sql',
-						  ],
+                    ],
                     'content' => $lang['strsql']
-					 ],
+                ],
                 'history' => [
                     'attr' => [
                         'href' => [
                             'url' => 'history.php',
                             'urlvars' => array_merge($reqvars, [
                                 'action' => 'pophistory'
-									 ])
-								],
+                            ])
+                        ],
                         'id' => 'toplink_history',
-						  ],
+                    ],
                     'content' => $lang['strhistory']
-					 ],
+                ],
                 'find' => [
                     'attr' => [
                         'href' => [
                             'url' => 'sqledit.php',
                             'urlvars' => array_merge($reqvars, [
                                 'action' => 'find'
-									 ])
-								],
+                            ])
+                        ],
                         'target' => "sqledit",
                         'id' => 'toplink_find',
-						  ],
+                    ],
                     'content' => $lang['strfind']
-					 ],
+                ],
                 'logout' => [
                     'attr' => [
                         'href' => [
@@ -85,19 +87,23 @@ class TopbarRenderer extends AppContext
                             'urlvars' => [
                                 'action' => 'logout',
                                 'logoutServer' => "{$server_info['host']}:{$server_info['port']}:{$server_info['sslmode']}"
-									 ]
-								],
+                            ]
+                        ],
                         'id' => 'toplink_logout',
-						  ],
+                    ],
                     'content' => $lang['strlogout']
-					 ]
-				];
+                ]
+            ];
+
+            if ($server_info['auth_type'] ?? 'cookie' !== 'cookie') {
+                unset($toplinks['logout']);
+            }
 
             // Toplink hook's place
             if ($pluginManager) {
                 $plugin_functions_parameters = [
                     'toplinks' => &$toplinks
-					 ];
+                ];
                 $pluginManager->do_hook('toplinks', $plugin_functions_parameters);
             }
 

@@ -13,7 +13,8 @@ $_ENV["SKIP_DB_CONNECTION"] = '1';
 include_once('./libraries/bootstrap.php');
 
 $action = $_REQUEST['action'] ?? '';
-if (!isset($msg)) $msg = '';
+if (!isset($msg))
+	$msg = '';
 
 function doLogout()
 {
@@ -63,14 +64,14 @@ function doDefault($msg = '')
 
 	$servers = $misc->getServers(true, $group);
 
-	function svPre(&$rowdata, $actions)
-	{
-		$actions['logout']['disable'] = empty($rowdata->fields['username']);
+	$svPre = function (&$rowdata, $actions) {
+		$actions['logout']['disable'] = empty($rowdata->fields['username']) || ($rowdata->fields['auth_type'] ?? 'cookie') !== 'cookie';
 		return $actions;
-	}
+	};
 
 	$columns = [
 		'server' => [
+			'icon' => 'Server',
 			'title' => $lang['strserver'],
 			'field' => field('desc'),
 			'url' => "redirect.php?subject=server&amp;",
@@ -85,6 +86,7 @@ function doDefault($msg = '')
 			'field' => field('port'),
 		],
 		'username' => [
+			'icon' => 'User',
 			'title' => $lang['strusername'],
 			'field' => field('username'),
 		],
@@ -110,11 +112,20 @@ function doDefault($msg = '')
 	];
 
 	if (($group !== false) and isset($conf['srv_groups'][$group])) {
-		$misc->printTitle(sprintf($lang['strgroupservers'], htmlentities($conf['srv_groups'][$group]['desc'], ENT_QUOTES, 'UTF-8')));
+		$misc->printTitle(
+			sprintf($lang['strgroupservers'], htmlentities($conf['srv_groups'][$group]['desc'], ENT_QUOTES, 'UTF-8'))
+		);
 		$actions['logout']['attr']['href']['urlvars']['group'] = $group;
 	}
 
-	$misc->printTable($servers, $columns, $actions, 'servers-servers', $lang['strnoobjects'], 'svPre');
+	$misc->printTable(
+		$servers,
+		$columns,
+		$actions,
+		'servers-servers',
+		$lang['strnoobjects'],
+		$svPre
+	);
 }
 
 function doTree()

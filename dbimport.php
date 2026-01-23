@@ -269,7 +269,7 @@ function handle_process_chunk_stream(): void
                 'deferred' => &$streamState['deferred'],
                 'truncated_tables' => &$streamState['truncated_tables'],
             ];
-            $GLOBALS['phppgadmin_import_quiet'] = true;
+            AppContainer::set('quiet_sql_error_handling', true);
             $roleActions = new RoleActions($pg);
             $isSuper = $roleActions->isSuperUser();
             ImportExecutor::executeStatementsBatch(
@@ -285,7 +285,7 @@ function handle_process_chunk_stream(): void
                 $logCollector,
                 $errors
             );
-            unset($GLOBALS['phppgadmin_import_quiet']);
+            AppContainer::set('quiet_sql_error_handling', false);
         };
 
         $executeDeferred = function () use (&$pg, &$streamState, $options, &$errors, $logCollector) {
@@ -312,7 +312,7 @@ function handle_process_chunk_stream(): void
                 'truncated_tables' => &$streamState['truncated_tables'],
             ];
 
-            $GLOBALS['phppgadmin_import_quiet'] = true;
+            AppContainer::set('quiet_sql_error_handling', true);
             try {
                 $roleActions = new RoleActions($pg);
                 $isSuper = $roleActions->isSuperUser();
@@ -334,7 +334,7 @@ function handle_process_chunk_stream(): void
                 $errors++;
                 $logCollector->addError('Deferred execution failed: ' . $e->getMessage());
             }
-            unset($GLOBALS['phppgadmin_import_quiet']);
+            AppContainer::set('quiet_sql_error_handling', false);
         };
 
         $copyHandlerFactory = function () use ($logCollector, &$pg, &$streamState, $options) {

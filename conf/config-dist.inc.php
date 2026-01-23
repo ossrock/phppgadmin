@@ -7,6 +7,18 @@
  * $Id: config.inc.php-dist,v 1.55 2008/02/18 21:10:31 xzilla Exp $
  */
 
+// Encryption key for securing credentials
+// (optional but required for 'config' auth_type)
+// Generate a new key by running:
+//     php -r "echo bin2hex(random_bytes(32)) . PHP_EOL;"
+// Or use: php bin/encrypt-password.php --generate-key
+// Store in environment variable PHPPGADMIN_ENCRYPTION_KEY (recommended)
+// or here:
+// $conf['encryption_key'] = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+// IMPORTANT: Keep this key secret! Anyone with this key can decrypt
+// stored passwords. If this key changes, all sessions will be invalidated
+// and users must re-authenticate.
+
 // An example server.  Create as many of these as you wish,
 // indexed from zero upwards.
 
@@ -35,14 +47,43 @@ $conf['servers'][0]['defaultdb'] = 'template1';
 // $conf['servers'][0]['pg_dump_path'] = '/usr/bin/pg_dump';
 // $conf['servers'][0]['pg_dumpall_path'] = '/usr/bin/pg_dumpall';
 
+// Authentication type for this server (optional, default: 'cookie')
+// 'cookie' - Standard login form (default behavior)
+// 'http'   - HTTP Basic Authentication
+// 'config' - Credentials stored in config (encrypted, requires encryption_key)
+// $conf['servers'][0]['auth_type'] = 'cookie';
+
+// For 'http' auth: Credentials will be taken from HTTP Basic Auth headers
+// No username/password needed in config
+
+// For 'config' auth: Store encrypted credentials in config
+// Generate encrypted password using:
+//     php bin/encrypt-password.php --password "your_password"
+// $conf['servers'][0]['auth_type'] = 'config';
+// $conf['servers'][0]['username'] = 'user';
+// $conf['servers'][0]['password'] = 'ENCRYPTED:base64encodedencryptedpassword';
+
 // Example for a second server (PostgreSQL for Windows)
 //$conf['servers'][1]['desc'] = 'Test Server';
 //$conf['servers'][1]['host'] = '127.0.0.1';
 //$conf['servers'][1]['port'] = 5432;
 //$conf['servers'][1]['sslmode'] = 'allow';
 //$conf['servers'][1]['defaultdb'] = 'template1';
-//$conf['servers'][1]['pg_dump_path'] = 'C:\\Program Files\\PostgreSQL\\18.0\\bin\\pg_dump.exe';
-//$conf['servers'][1]['pg_dumpall_path'] = 'C:\\Program Files\\PostgreSQL\\18.0\\bin\\pg_dumpall.exe';
+//$conf['servers'][1]['pg_dump_path'] = 'C:\\Program Files\\PostgreSQL\\18.1\\bin\\pg_dump.exe';
+//$conf['servers'][1]['pg_dumpall_path'] = 'C:\\Program Files\\PostgreSQL\\18.1\\bin\\pg_dumpall.exe';
+
+// Example: HTTP Basic Authentication for server 1
+//$conf['servers'][1]['auth_type'] = 'http';
+
+// Example: Config-based authentication (requires encryption_key below)
+//$conf['servers'][2]['desc'] = 'Auto Login Server';
+//$conf['servers'][2]['host'] = 'localhost';
+//$conf['servers'][2]['port'] = 5432;
+//$conf['servers'][2]['sslmode'] = 'allow';
+//$conf['servers'][2]['defaultdb'] = 'postgres';
+//$conf['servers'][2]['auth_type'] = 'config';
+//$conf['servers'][2]['username'] = 'myuser';
+//$conf['servers'][2]['password'] = 'ENCRYPTED:base64encodedencryptedpassword';
 
 
 /* Groups definition */

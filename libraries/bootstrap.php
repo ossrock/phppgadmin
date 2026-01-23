@@ -10,6 +10,7 @@ use PhpPgAdmin\Core\AppContainer;
 use PhpPgAdmin\Database\Actions\SchemaActions;
 use PhpPgAdmin\Misc;
 use PhpPgAdmin\PluginManager;
+use PhpPgAdmin\Security\CredentialEncryption;
 
 require_once __DIR__ . '/decorator.php';
 require_once __DIR__ . '/helper.php';
@@ -84,6 +85,27 @@ if (!empty($conf['session_timeout'])) {
 if (!ini_get('session.auto_start')) {
 	session_name('PPA_ID');
 	session_start();
+}
+
+// Validate encryption key version - invalidate session if key changed
+try {
+	$currentKeyHash = CredentialEncryption::getKeyHash($conf);
+
+	if (isset($_SESSION['encryption_version'])) {
+		// Key hash exists in session - check if it matches current key
+		if ($_SESSION['encryption_version'] !== $currentKeyHash) {
+			// Key changed - invalidate session to force re-authentication
+			session_destroy();
+			unset($_SESSION);
+			session_start();
+		}
+	}
+
+	// Store current key hash in session
+	$_SESSION['encryption_version'] = $currentKeyHash;
+} catch (Exception $e) {
+	// Encryption key is invalid - clear session and show error
+	die('Encryption key error: ' . htmlspecialchars($e->getMessage()));
 }
 
 // Always include english.php, since it's the master language file
@@ -376,7 +398,62 @@ if (empty($_ENV["SKIP_DB_CONNECTION"] ?? '')) {
 	/* starting with PostgreSQL 9.0, we can set the application name */
 	putenv("PGAPPNAME={$appName}_{$appVersion}");
 
-	// Redirect to the login form if not logged in
+	// Handle different authentication types
+	$auth_type = $_server_info['auth_type'] ?? 'form';
+
+	// HTTP Basic Authentication
+	if ($auth_type === 'http') {
+		if (!isset($_SERVER['PHP_AUTH_USER']) || !isset($_SERVER['PHP_AUTH_PW'])) {
+			// No credentials provided - send authentication challenge
+			header('WWW-Authenticate: Basic realm="' . addslashes($_server_info['desc']) . '"');
+			header('HTTP/1.0 401 Unauthorized');
+			echo $lang['strloginfailed'] ?? 'Authentication required';
+			exit;
+		}
+
+		// Store HTTP Basic Auth credentials in session
+		if (!isset($_server_info['username'])) {
+			$_server_info['username'] = $_SERVER['PHP_AUTH_USER'];
+			$_server_info['password'] = $_SERVER['PHP_AUTH_PW'];
+			$misc->setServerInfo(null, $_server_info, $_REQUEST['server']);
+			AppContainer::setShouldReloadTree(true);
+		}
+	}
+
+	// Config-based authentication with encrypted credentials
+	if ($auth_type === 'config') {
+		if (!isset($_server_info['username']) || !isset($_server_info['password'])) {
+			die('Configuration error: auth_type=config requires username and password in server configuration');
+		}
+
+		// Check if password is encrypted (starts with ENCRYPTED: prefix)
+		$password = $_server_info['password'];
+		if (strpos($password, 'ENCRYPTED:') === 0) {
+			try {
+				// Decrypt password
+				$encrypted = substr($password, 10); // Remove "ENCRYPTED:" prefix
+				$password = CredentialEncryption::decrypt($encrypted, $conf);
+
+				// Store decrypted password in session if not already stored
+				if (!isset($_SESSION['webdbLogin'][$_REQUEST['server']]['password'])) {
+					$_server_info['password'] = $password;
+					$misc->setServerInfo(null, $_server_info, $_REQUEST['server']);
+				}
+			} catch (Exception $e) {
+				die('Configuration error: Failed to decrypt password: ' . htmlspecialchars($e->getMessage()));
+			}
+		} else {
+			// Plain text password in config (not recommended but allowed)
+			if (!isset($_SESSION['webdbLogin'][$_REQUEST['server']]['password'])) {
+				$misc->setServerInfo(null, $_server_info, $_REQUEST['server']);
+			}
+		}
+
+		// Reload server info to get the decrypted/stored credentials
+		$_server_info = $misc->getServerInfo();
+	}
+
+	// Redirect to the login form if not logged in (form authentication only)
 	if (!isset($_server_info['username'])) {
 		include('./login.php');
 		exit;

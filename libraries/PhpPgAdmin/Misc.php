@@ -18,6 +18,7 @@ use PhpPgAdmin\Gui\NavLinksRenderer;
 use PhpPgAdmin\Gui\TableRenderer;
 use PhpPgAdmin\Gui\TabsRenderer;
 use PhpPgAdmin\Gui\TopbarRenderer;
+use PhpPgAdmin\Security\CredentialEncryption;
 use PhpPgAdmin\Gui\TrailRenderer;
 
 /**
@@ -210,26 +211,29 @@ class Misc extends AppContext
 
 		// Create a database wrapper class for easy manipulation of the
 		// connection.
-		$className = "\\PhpPgAdmin\\Database\\$driverName";
-		$postgres = new $className($connector->conn, $majorVersion);
+		//$className = "\\PhpPgAdmin\\Database\\$driverName";
+		$postgres = new Postgres($connector->conn, $majorVersion);
 		$postgres->platform = $connector->platform;
 
 		// we work on UTF-8 only encoding
-		$postgres->execute("SET client_encoding TO 'UTF-8'");
+		$queries = "SET client_encoding TO 'UTF-8';";
 
 		// Enable standard conforming strings for versions < 9.1
 		// Since 9.1, this is already the default
 		if ($majorVersion < 9.1) {
-			$postgres->execute("SET standard_conforming_strings = on");
+			$queries .= " SET standard_conforming_strings = on;";
 		}
 
-		$locale = $lang['applocale'] . '.UTF-8';
-		$postgres->execute("SET lc_messages = '$locale'");
-
 		//if ($postgres->hasByteaHexDefault()) {
-		//	$postgres->execute("SET bytea_output TO escape");
+		//	$queries .= " SET bytea_output TO escape;";
 		//}
 
+		$locale = $lang['applocale'] . '.UTF-8';
+		$queries .= " SET lc_messages = '$locale';";
+
+		AppContainer::set('quiet_sql_error_handling', true);
+		$postgres->execute($queries);
+		AppContainer::set('quiet_sql_error_handling', false);
 
 		return $postgres;
 	}
@@ -954,8 +958,24 @@ class Misc extends AppContext
 			$server_id = $_REQUEST['server'];
 
 		// Check for the server in the logged-in list
-		if (isset($_SESSION['webdbLogin'][$server_id]))
-			return $_SESSION['webdbLogin'][$server_id];
+		if (isset($_SESSION['webdbLogin'][$server_id])) {
+			$info = $_SESSION['webdbLogin'][$server_id];
+
+			// Decrypt password if encryption is available and password is encrypted
+			if (isset($info['password']) && CredentialEncryption::isAvailable($conf)) {
+				try {
+					// Check if password looks encrypted (base64, sufficient length)
+					if (CredentialEncryption::looksEncrypted($info['password'])) {
+						$info['password'] = CredentialEncryption::decrypt($info['password'], $conf);
+					}
+				} catch (\Exception $e) {
+					// If decryption fails, leave password as-is (might be plaintext)
+					// This maintains backward compatibility
+				}
+			}
+
+			return $info;
+		}
 
 		// Otherwise, look for it in the conf file
 		foreach ($conf['servers'] as $idx => $info) {
@@ -991,19 +1011,45 @@ class Misc extends AppContext
 	 */
 	function setServerInfo($key, $value, $server_id = null)
 	{
+		$conf = $this->conf();
+
 		if ($server_id === null && isset($_REQUEST['server']))
 			$server_id = $_REQUEST['server'];
 
 		if ($key === null) {
-			if ($value === null)
+			if ($value === null) {
 				unset($_SESSION['webdbLogin'][$server_id]);
-			else
+			} else {
+				// Encrypt password if encryption is available and value is an array with password
+				if (is_array($value) && isset($value['password']) && CredentialEncryption::isAvailable($conf)) {
+					try {
+						// Only encrypt if it doesn't already look encrypted
+						if (!CredentialEncryption::looksEncrypted($value['password'])) {
+							$value['password'] = CredentialEncryption::encrypt($value['password'], $conf);
+						}
+					} catch (\Exception $e) {
+						// If encryption fails, store plaintext (fallback for compatibility)
+					}
+				}
 				$_SESSION['webdbLogin'][$server_id] = $value;
+			}
 		} else {
-			if ($value === null)
+			if ($value === null) {
 				unset($_SESSION['webdbLogin'][$server_id][$key]);
-			else
+			} else {
+				// Encrypt password field if encryption is available
+				if ($key === 'password' && CredentialEncryption::isAvailable($conf)) {
+					try {
+						// Only encrypt if it doesn't already look encrypted
+						if (!CredentialEncryption::looksEncrypted($value)) {
+							$value = CredentialEncryption::encrypt($value, $conf);
+						}
+					} catch (\Exception $e) {
+						// If encryption fails, store plaintext (fallback for compatibility)
+					}
+				}
 				$_SESSION['webdbLogin'][$server_id][$key] = $value;
+			}
 		}
 	}
 

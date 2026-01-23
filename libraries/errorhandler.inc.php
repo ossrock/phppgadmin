@@ -23,15 +23,15 @@ if (!defined('ADODB_ERROR_HANDLER'))
  */
 function Error_Handler($dbms, $fn, $errno, $errmsg, $p1 = false, $p2 = false)
 {
-	// If import processing requested quiet error handling, log and return
-	if (!empty($GLOBALS['phppgadmin_import_quiet'])) {
+	// If requested quiet error handling, log and return
+	if (AppContainer::get('quiet_sql_error_handling', false)) {
 		if ($fn === 'EXECUTE') {
 			$sql = $p1;
 			$short = "SQL error: $errmsg; in statement: " . ($sql ?: '[no sql]');
 		} else {
 			$short = "$dbms error: [$errno] $errmsg in $fn";
 		}
-		$GLOBALS['phppgadmin_import_last_error'] = $short;
+		AppContainer::set('last_sql_error', $short);
 		error_log($short);
 		return;
 	}
