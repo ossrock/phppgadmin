@@ -134,7 +134,7 @@ class TableRenderer extends AppContext
                         case 'actions':
                             echo "<td class=\"action-buttons {$class}\">";
                             foreach ($alt_actions as $action) {
-                                if ($action['disable'] ?? false) {
+                                if (value($action['disable'] ?? false, $tabledata->fields)) {
                                     continue;
                                 }
                                 echo "<span class=\"opbutton{$id} op-button\">";

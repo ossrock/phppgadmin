@@ -166,8 +166,6 @@ function doReindex($type, $confirm = false)
 					return;
 				}
 			}
-			// Everything went fine, back to the Default page....
-			AppContainer::setShouldReloadPage(true);
 			doDefault($msg);
 		} else {
 			$status = $indexActions->reindex(
@@ -176,7 +174,6 @@ function doReindex($type, $confirm = false)
 				false
 			);
 			if ($status == 0) {
-				AppContainer::setShouldReloadPage(true);
 				doAdmin($type, $lang['strreindexgood']);
 			} else
 				doAdmin($type, $lang['strreindexbad']);
@@ -252,14 +249,11 @@ function doAnalyze($type, $confirm = false)
 					return;
 				}
 			}
-			// Everything went fine, back to the Default page....
-			AppContainer::setShouldReloadPage(true);
 			doDefault($msg);
 		} else {
 			//we must pass table here. When empty, analyze the whole db
 			$status = $adminActions->analyzeDB($_REQUEST['table']);
 			if ($status == 0) {
-				AppContainer::setShouldReloadPage(true);
 				doAdmin($type, $lang['stranalyzegood']);
 			} else
 				doAdmin($type, $lang['stranalyzebad']);
@@ -351,8 +345,6 @@ function doVacuum($type, $confirm = false)
 					return;
 				}
 			}
-			// Everything went fine, back to the Default page....
-			AppContainer::setShouldReloadPage(true);
 			doDefault($msg);
 		} else {
 			//we must pass table here. When empty, vacuum the whole db
@@ -363,7 +355,6 @@ function doVacuum($type, $confirm = false)
 				isset($_REQUEST['vacuum_freeze'])
 			);
 			if ($status == 0) {
-				AppContainer::setShouldReloadPage(true);
 				doAdmin($type, $lang['strvacuumgood']);
 			} else
 				doAdmin($type, $lang['strvacuumbad']);

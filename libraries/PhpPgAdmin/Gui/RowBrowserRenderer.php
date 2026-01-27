@@ -784,6 +784,12 @@ class RowBrowserRenderer extends AppContext
         // Build strings for GETs in array
         $_gets = $this->buildBrowseGets($subject, $table_name, $conf);
 
+        if ($subject === 'view') {
+            // Clear FK info for views
+            $fkey_information = [];
+            $key_fields = [];
+        }
+
         $_sub_params = $_gets;
         unset($_sub_params['query']);
         unset($_sub_params['orderby']);

@@ -806,4 +806,10 @@ class Postgres extends PgBase
 	{
 		return true;
 	}
+
+	function hasMatViews()
+	{
+		// Materialized views were introduced in PostgreSQL 9.3
+		return $this->major_version >= 9.3;
+	}
 }

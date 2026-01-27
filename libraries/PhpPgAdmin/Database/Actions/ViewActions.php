@@ -10,27 +10,6 @@ class ViewActions extends ActionsBase
 {
 
     /**
-     * Returns all details for a particular view.
-     */
-    public function getView($view)
-    {
-        $c_schema = $this->connection->_schema;
-        $this->connection->clean($c_schema);
-        $this->connection->clean($view);
-
-        $sql =
-            "SELECT c.relname, n.nspname, c.relkind,
-                pg_catalog.pg_get_userbyid(c.relowner) AS relowner,
-                pg_catalog.pg_get_viewdef(c.oid, true) AS vwdefinition,
-                pg_catalog.obj_description(c.oid, 'pg_class') AS relcomment
-            FROM pg_catalog.pg_class c
-            LEFT JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)
-            WHERE (c.relname = '{$view}') AND n.nspname='{$c_schema}'";
-
-        return $this->connection->selectSet($sql);
-    }
-
-    /**
      * Returns a list of views and/or materialized views in the current schema.
      *
      * @param bool $normal       get normal views
@@ -53,20 +32,39 @@ class ViewActions extends ActionsBase
         }
 
         $sql =
-            "SELECT c.relname,
+            "SELECT c.oid, c.relname, c.relkind,
                 pg_catalog.pg_get_userbyid(c.relowner) AS relowner,
-                pg_catalog.obj_description(c.oid, 'pg_class') AS relcomment,
-                c.relkind
+                pg_catalog.obj_description(c.oid, 'pg_class') AS relcomment
             FROM pg_catalog.pg_class c
             LEFT JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)
             WHERE n.nspname = '{$c_schema}'
             AND c.relkind IN ($relkind)
-            ORDER BY c.relname
+            ORDER BY c.relkind, c.relname
         ";
 
         return $this->connection->selectSet($sql);
     }
 
+    /**
+     * Returns all details for a particular view.
+     */
+    public function getView($view)
+    {
+        $c_schema = $this->connection->_schema;
+        $this->connection->clean($c_schema);
+        $this->connection->clean($view);
+
+        $sql =
+            "SELECT c.oid, c.relname, c.relkind, n.nspname,
+                pg_catalog.pg_get_userbyid(c.relowner) AS relowner,
+                pg_catalog.pg_get_viewdef(c.oid, true) AS vwdefinition,
+                pg_catalog.obj_description(c.oid, 'pg_class') AS relcomment
+            FROM pg_catalog.pg_class c
+            LEFT JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)
+            WHERE (c.relname = '{$view}') AND n.nspname='{$c_schema}'";
+
+        return $this->connection->selectSet($sql);
+    }
 
     /**
      * Updates a view (OR REPLACE).
@@ -219,7 +217,8 @@ class ViewActions extends ActionsBase
     }
 
     /**
-     * Drops a view.
+     * Drops a view or materialized view.
+     * Automatically detects the view type from the database.
      */
     public function dropView($viewname, $cascade)
     {
@@ -227,10 +226,71 @@ class ViewActions extends ActionsBase
         $this->connection->fieldClean($f_schema);
         $this->connection->fieldClean($viewname);
 
-        $sql = "DROP VIEW \"{$f_schema}\".\"{$viewname}\"";
+        // Detect view type (regular view 'v' or materialized view 'm')
+        $viewData = $this->getView($viewname);
+        $viewType = 'VIEW';
+        if ($viewData->recordCount() == 1 && $viewData->fields['relkind'] == 'm') {
+            $viewType = 'MATERIALIZED VIEW';
+        }
+
+        $sql = "DROP {$viewType} \"{$f_schema}\".\"{$viewname}\"";
         if ($cascade) {
             $sql .= ' CASCADE';
         }
+
+        return $this->connection->execute($sql);
+    }
+
+    /**
+     * Creates a new materialized view.
+     */
+    public function createMaterializedView($viewname, $definition, $comment, $withData = false)
+    {
+        $status = $this->connection->beginTransaction();
+        if ($status != 0) {
+            return -1;
+        }
+
+        $f_schema = $this->connection->_schema;
+        $this->connection->fieldClean($f_schema);
+        $this->connection->fieldClean($viewname);
+
+        $sql = "CREATE MATERIALIZED VIEW \"{$f_schema}\".\"{$viewname}\" AS {$definition}";
+        if (!$withData) {
+            $sql .= ' WITH NO DATA';
+        }
+
+        $status = $this->connection->execute($sql);
+        if ($status) {
+            $this->connection->rollbackTransaction();
+            return -1;
+        }
+
+        if ($comment != '') {
+            $status = $this->connection->setComment('MATERIALIZED VIEW', $viewname, '', $comment);
+            if ($status) {
+                $this->connection->rollbackTransaction();
+                return -1;
+            }
+        }
+
+        return $this->connection->endTransaction();
+    }
+
+    /**
+     * Refreshes a materialized view.
+     */
+    public function refreshMaterializedView($viewname, $concurrently = false)
+    {
+        $f_schema = $this->connection->_schema;
+        $this->connection->fieldClean($f_schema);
+        $this->connection->fieldClean($viewname);
+
+        $sql = 'REFRESH MATERIALIZED VIEW';
+        if ($concurrently) {
+            $sql .= ' CONCURRENTLY';
+        }
+        $sql .= " \"{$f_schema}\".\"{$viewname}\"";
 
         return $this->connection->execute($sql);
     }

@@ -7,6 +7,7 @@ use PhpPgAdmin\Database\Actions\ViewActions;
 use PhpPgAdmin\Database\Actions\TableActions;
 use PhpPgAdmin\Database\Actions\SchemaActions;
 use PhpPgAdmin\Database\Actions\ConstraintActions;
+use PhpPgAdmin\Database\Actions\IndexActions;
 
 /**
  * Manage views in a database
@@ -105,6 +106,59 @@ function doDrop($confirm)
 }
 
 /**
+ * Show confirmation of refresh and perform actual refresh for materialized views
+ */
+function doRefresh($confirm)
+{
+	$pg = AppContainer::getPostgres();
+	$misc = AppContainer::getMisc();
+	$lang = AppContainer::getLang();
+	$viewActions = new ViewActions($pg);
+	$indexActions = new IndexActions($pg);
+
+	if (empty($_REQUEST['view'])) {
+		doDefault($lang['strspecifyviewtodrop']);
+		exit();
+	}
+
+	if ($confirm) {
+		$misc->printTrail('view');
+		$misc->printTitle($lang['strrefreshmaterializedview'], 'pg.matview.alter');
+
+		echo "<form action=\"views.php\" method=\"post\">\n";
+		echo "<p>", sprintf($lang['strconfrefreshmaterializedview'], $misc->printVal($_REQUEST['view'])), "</p>\n";
+
+		// Check if CONCURRENTLY option is available
+		$canUseConcurrently = false;
+		if ($pg->major_version >= 9.4) {
+			$uniqueIndexes = $indexActions->getIndexes($_REQUEST['view'], true);
+			$canUseConcurrently = !$uniqueIndexes->EOF;
+		}
+
+		if ($canUseConcurrently) {
+			echo "<p><input type=\"checkbox\" id=\"concurrent\" name=\"concurrent\" /> <label for=\"concurrent\">{$lang['strconcurrently']}</label></p>\n";
+			echo "<p class=\"message\">{$lang['strconcurrentlyrequiresunique']}</p>\n";
+		} elseif ($pg->major_version >= 9.4) {
+			echo "<p class=\"message\">{$lang['strconcurrentlyneedsunique']}</p>\n";
+		}
+
+		echo "<input type=\"hidden\" name=\"action\" value=\"refresh\" />\n";
+		echo "<input type=\"hidden\" name=\"view\" value=\"", html_esc($_REQUEST['view']), "\" />\n";
+		echo $misc->form;
+		echo "<input type=\"submit\" name=\"refresh\" value=\"{$lang['strrefresh']}\" />\n";
+		echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" />\n";
+		echo "</form>\n";
+	} else {
+		$status = $viewActions->refreshMaterializedView($_POST['view'], isset($_POST['concurrent']));
+		if ($status == 0) {
+			doDefault($lang['strmaterializedviewrefreshed']);
+		} else {
+			doDefault($lang['strmaterializedviewrefreshedbad']);
+		}
+	}
+}
+
+/**
  * Sets up choices for table linkage, and which fields to select for the view we're creating
  */
 function doSetParamsCreate($msg = '')
@@ -183,6 +237,27 @@ function doSetParamsCreate($msg = '')
 							maxlength="<?= $pg->_maxNameLen ?>" />
 					</td>
 				</tr>
+				<?php if ($pg->hasMatViews()): ?>
+					<tr>
+						<th class="data">
+							<?= $lang['strviewtype'] ?>
+
+						</th>
+					</tr>
+					<tr>
+						<td class="data1">
+							<select name="formViewType">
+								<option value="view" selected="selected"><?= $lang['strnormalview'] ?></option>
+								<option value="materialized_with_data"><?= $lang['strmaterializedview'] ?> -
+									<?= $lang['strwithdata'] ?>
+								</option>
+								<option value="materialized_no_data"><?= $lang['strmaterializedview'] ?> -
+									<?= $lang['strwithnodata'] ?>
+								</option>
+							</select>
+						</td>
+					</tr>
+				<?php endif; ?>
 				<tr>
 					<th class="data">
 						<?= $lang['strcomment'] ?>
@@ -366,7 +441,7 @@ function doCreate($msg = '')
 	if (!isset($_REQUEST['formView']))
 		$_REQUEST['formView'] = '';
 	if (!isset($_REQUEST['formDefinition'])) {
-		if (isset($_SESSION['sqlquery']))
+		if (isset($_SESSION['sqlquery']) && isSqlReadQuery($_SESSION['sqlquery']))
 			$_REQUEST['formDefinition'] = $_SESSION['sqlquery'];
 		else
 			$_REQUEST['formDefinition'] = 'SELECT ';
@@ -389,12 +464,32 @@ function doCreate($msg = '')
 				<td class="data1"><input name="formView" size="32" maxlength="<?= $pg->_maxNameLen ?>"
 						value="<?= html_esc($_REQUEST['formView']) ?>" /></td>
 			</tr>
+			<?php if ($pg->hasMatViews()): ?>
+				<tr>
+					<th class="data left required">
+						<?= $lang['strviewtype'] ?>
+					</th>
+					<td class="data1">
+						<select name="formViewType">
+							<option value="view" selected="selected"><?= $lang['strnormalview'] ?></option>
+							<option value="materialized_with_data"><?= $lang['strmaterializedview'] ?> -
+								<?= $lang['strwithdata'] ?>
+							</option>
+							<option value="materialized_no_data"><?= $lang['strmaterializedview'] ?> -
+								<?= $lang['strwithnodata'] ?>
+							</option>
+						</select>
+					</td>
+				</tr>
+			<?php endif; ?>
 			<tr>
 				<th class="data left required">
 					<?= $lang['strdefinition'] ?>
 				</th>
-				<td class="data1"><textarea style="width:100%;" rows="10" cols="50"
-						name="formDefinition"><?= html_esc($_REQUEST['formDefinition']) ?></textarea></td>
+				<td class="data1">
+					<textarea class="sql-editor frame big resizable" style="width:100%;" rows="10" cols="50"
+						name="formDefinition"><?= html_esc($_REQUEST['formDefinition']) ?></textarea>
+				</td>
 			</tr>
 			<tr>
 				<th class="data left">
@@ -428,12 +523,27 @@ function doSaveCreate()
 	elseif ($_POST['formDefinition'] == '')
 		doCreate($lang['strviewneedsdef']);
 	else {
-		$status = $viewActions->createView($_POST['formView'], $_POST['formDefinition'], false, $_POST['formComment']);
-		if ($status == 0) {
-			AppContainer::setShouldReloadTree(true);
-			doDefault($lang['strviewcreated']);
-		} else
-			doCreate($lang['strviewcreatedbad']);
+		// Determine view type from radio button
+		$viewType = $_POST['formViewType'] ?? 'view';
+
+		if ($viewType == 'view') {
+			// Create normal view
+			$status = $viewActions->createView($_POST['formView'], $_POST['formDefinition'], false, $_POST['formComment']);
+			if ($status == 0) {
+				AppContainer::setShouldReloadTree(true);
+				doDefault($lang['strviewcreated']);
+			} else
+				doCreate($lang['strviewcreatedbad']);
+		} else {
+			// Create materialized view
+			$withData = ($viewType == 'materialized_with_data');
+			$status = $viewActions->createMaterializedView($_POST['formView'], $_POST['formDefinition'], $_POST['formComment'], $withData);
+			if ($status == 0) {
+				AppContainer::setShouldReloadTree(true);
+				doDefault($lang['strviewcreated']);
+			} else
+				doCreate($lang['strviewcreatedbad']);
+		}
 	}
 }
 
@@ -566,7 +676,18 @@ function doSaveCreateWiz()
 	if (strlen($addConditions))
 		$viewQuery .= ' WHERE ' . $addConditions;
 
-	$status = $viewActions->createView($_POST['formView'], $viewQuery, false, $_POST['formComment']);
+	// Determine view type from radio button
+	$viewType = $_POST['formViewType'] ?? 'view';
+
+	if ($viewType == 'view') {
+		// Create normal view
+		$status = $viewActions->createView($_POST['formView'], $viewQuery, false, $_POST['formComment']);
+	} else {
+		// Create materialized view
+		$withData = ($viewType == 'materialized_with_data');
+		$status = $viewActions->createMaterializedView($_POST['formView'], $viewQuery, $_POST['formComment'], $withData);
+	}
+
 	if ($status == 0) {
 		AppContainer::setShouldReloadTree(true);
 		doDefault($lang['strviewcreated']);
@@ -589,7 +710,15 @@ function doDefault($msg = '')
 	$misc->printTabs('schema', 'views');
 	$misc->printMsg($msg);
 
-	$views = $viewActions->getViews();
+	$views = $viewActions->getViews(true, true); // Get both normal and materialized views
+
+	$preFnc = function (&$row, $actions) {
+		if ($row->fields['relkind'] != 'm') {
+			// Remove refresh action for normal views
+			unset($actions['refresh']);
+		}
+		return $actions;
+	};
 
 	$columns = [
 		'view' => [
@@ -597,8 +726,16 @@ function doDefault($msg = '')
 			'field' => field('relname'),
 			'url' => "redirect.php?subject=view&amp;{$misc->href}&amp;",
 			'vars' => ['view' => 'relname'],
-			'icon' => $misc->icon('View'),
+			'icon' => callback(function ($row) use ($misc) {
+				return ($row['relkind'] == 'm') ? $misc->icon('MaterializedView') : $misc->icon('View');
+			}),
 			'class' => 'nowrap',
+		],
+		'type' => [
+			'title' => $lang['strtype'],
+			'field' => callback(function ($row) use ($lang) {
+				return ($row['relkind'] == 'm') ? $lang['strmaterializedview'] : $lang['strview'];
+			}),
 		],
 		'owner' => [
 			'title' => $lang['strowner'],
@@ -680,6 +817,23 @@ function doDefault($msg = '')
 					]
 				]
 			]
+		],
+		'refresh' => [
+			'icon' => $misc->icon('Refresh'),
+			'content' => $lang['strrefresh'],
+			'attr' => [
+				'href' => [
+					'url' => 'views.php',
+					'urlvars' => [
+						'action' => 'confirm_refresh',
+						'view' => field('relname')
+					]
+				]
+			],
+			'disable' => callback(function ($row) {
+				// Only show refresh for materialized views
+				return $row['relkind'] != 'm';
+			}),
 		],
 	];
 
@@ -851,6 +1005,15 @@ switch ($action) {
 		break;
 	case 'confirm_drop':
 		doDrop(true);
+		break;
+	case 'refresh':
+		if (isset($_POST['refresh']))
+			doRefresh(false);
+		else
+			doDefault();
+		break;
+	case 'confirm_refresh':
+		doRefresh(true);
 		break;
 	default:
 		doDefault();

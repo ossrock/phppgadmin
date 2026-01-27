@@ -742,7 +742,15 @@ class Misc extends AppContext
 		$conf = $this->conf();
 		static $cache = null;
 		if (!isset($cache)) {
-			$cache = self::buildIconCache();
+			$hasSessionCache = isset($_SESSION['iconCacheData']) &&
+				($_SESSION['iconCacheVersion'] ?? '') === AppContainer::getAppVersion();
+			if ($hasSessionCache) {
+				$cache = $_SESSION['iconCacheData'];
+			} else {
+				$cache = self::buildIconCache();
+				$_SESSION['iconCacheData'] = $cache;
+				$_SESSION['iconCacheVersion'] = AppContainer::getAppVersion();
+			}
 		}
 		if (!isset($icon)) {
 			return '';

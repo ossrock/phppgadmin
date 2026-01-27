@@ -160,7 +160,7 @@ EOT;
 
 		if (AppContainer::shouldReloadPage()) {
 			echo "<script>\n";
-			echo "\twindow.location.replace(\"index.php\");\n";
+			echo "\twindow.location.href=\"index.php\";\n";
 			echo "</script>\n";
 		} elseif (AppContainer::shouldReloadTree()) {
 			echo "<script>\n";

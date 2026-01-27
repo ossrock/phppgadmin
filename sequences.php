@@ -633,8 +633,8 @@ function doSaveAlter()
 		if ($_POST['sequence'] != $_POST['name']) {
 			// Jump them to the new view name
 			$_REQUEST['sequence'] = $_POST['name'];
-			// Force a browser reload
-			AppContainer::setShouldReloadPage(true);
+			// Reload the tree
+			AppContainer::setShouldReloadTree(true);
 		}
 		if (!empty($_POST['newschema']) && ($_POST['newschema'] != $pg->_schema)) {
 			// Jump them to the new sequence schema

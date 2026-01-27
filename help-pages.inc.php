@@ -135,7 +135,7 @@ return [
 
     'pg.view' => 'tutorial-views.html',
     'pg.view.alter' => ['sql-createview.html', 'sql-altertable.html'],
-    'pg.view.create' => 'sql-createview.html',
+    'pg.view.create' => ['sql-createview.html', 'sql-creatematerializedview.html'],
     'pg.view.drop' => 'sql-dropview.html',
 
     'pg.aggregate' => ['xaggr.html', 'tutorial-agg.html', 'functions-aggregate.html', 'sql-expressions.html#SYNTAX-AGGREGATES'],

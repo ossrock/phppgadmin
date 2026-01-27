@@ -509,6 +509,20 @@ $lang['strerrordupfields'] = 'Error on duplicate fields';
 $lang['strviewaltered'] = 'View altered.';
 $lang['strviewalteredbad'] = 'View alteration failed.';
 $lang['strspecifyviewtodrop'] = 'You must specify at least one view to drop.';
+$lang['strmaterializedview'] = 'Materialized View';
+$lang['strmaterializedviews'] = 'Materialized Views';
+$lang['strcreatematerializedview'] = 'Create materialized view';
+$lang['strviewtype'] = 'View type';
+$lang['strnormalview'] = 'Normal view';
+$lang['strwithdata'] = 'With data';
+$lang['strwithnodata'] = 'With NO DATA';
+$lang['strrefreshmaterializedview'] = 'Refresh materialized view';
+$lang['strmaterializedviewrefreshed'] = 'Materialized view refreshed.';
+$lang['strmaterializedviewrefreshedbad'] = 'Materialized view refresh failed.';
+$lang['strconcurrently'] = 'Concurrently';
+$lang['strconcurrentlyrequiresunique'] = 'Concurrent refresh requires a unique index.';
+$lang['strconcurrentlyneedsunique'] = 'Concurrent refresh is not available (requires a unique index).';
+$lang['strconfrefreshmaterializedview'] = 'Are you sure you want to refresh the materialized view "%s"?';
 
 // Sequences
 $lang['strsequence'] = 'Sequence';

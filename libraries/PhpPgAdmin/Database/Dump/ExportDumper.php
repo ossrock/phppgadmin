@@ -52,6 +52,7 @@ abstract class ExportDumper extends AppContext
     protected function createSubDumper($subject, $connection = null)
     {
         $dumper = DumpFactory::create($subject, $connection ?? $this->connection);
+
         if ($this->outputStream) {
             $dumper->setOutputStream($this->outputStream);
         }
@@ -253,7 +254,7 @@ abstract class ExportDumper extends AppContext
     protected function shouldIncludeComments($options)
     {
         // Default to true (include comments) unless explicitly disabled
-        return !isset($options['include_comments']) || $options['include_comments'];
+        return $options['include_comments'] ?? true;
     }
 
     /**
@@ -262,20 +263,6 @@ abstract class ExportDumper extends AppContext
     protected function getIfNotExists($options)
     {
         return (!empty($options['if_not_exists'])) ? "IF NOT EXISTS " : "";
-    }
-
-    /**
-     * Get table/view data as ADORecordSet.
-     * Default implementation returns null.
-     * Subclasses should override if they support data export.
-     * 
-     * @param array $params Parameters with 'table' or 'view' key
-     * @return mixed ADORecordSet or null if not supported
-     */
-    public function getTableData(array $params)
-    {
-        // Default: not supported by this dumper type
-        throw new \Exception("getTableData method not implemented in " . get_class($this));
     }
 
     /**
