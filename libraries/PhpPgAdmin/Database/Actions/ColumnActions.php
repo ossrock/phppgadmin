@@ -90,7 +90,7 @@ class ColumnActions extends ActionsBase
      * @param mixed $olddefault The old default for the column
      * @param string $type The new type for the column
      * @param bool $array True if array type, false otherwise
-     * @param int $length The optional size of the column (ie. 30 for varchar(30))
+     * @param string $length The optional size of the column (ie. 30 for varchar(30))
      * @param string $oldtype The old type for the column
      * @param string $comment Comment for the column
      * @return int 0 success

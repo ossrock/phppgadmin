@@ -347,7 +347,7 @@
 	/**
 	 * @param {HTMLElement} element
 	 */
-	function createSqlEditor(element) {
+	function createSqlEditor(element, options = {}) {
 		if (element.classList.contains("ace_editor")) {
 			// Editor already created
 			return;
@@ -423,6 +423,11 @@
 			editor.focus();
 		};
 
+		if (options.selected) {
+			editor.selectAll();
+			editor.focus();
+		}
+
 		if (element.classList.contains("auto-expand")) {
 			// We resize the editor height according to content but not below
 			// the height that is defined in CSS
@@ -473,10 +478,10 @@
 	 *
 	 * @param {HTMLElement} rootElement
 	 */
-	function createSqlEditors(rootElement) {
+	function createSqlEditors(rootElement, options = {}) {
 		rootElement.querySelectorAll(".sql-editor").forEach((element) => {
 			//console.log(element);
-			createSqlEditor(element);
+			createSqlEditor(element, options);
 		});
 
 		const elements = Array.from(

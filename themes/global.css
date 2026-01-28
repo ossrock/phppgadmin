@@ -450,15 +450,6 @@ td[class^="opbutton"] img.icon {
 	height: 500px;
 }
 
-.sql-viewer.ace_editor,
-.sql-viewer.ace_editor .ace_content,
-.sql-viewer.ace_editor .ace_scroller {
-	min-width: 300px;
-	max-width: 1800px;
-	box-sizing: border-box !important;
-	background-color: transparent !important;
-}
-
 .ace_editor .ace_constant.ace_numeric {
 	color: #c1571a;
 }
@@ -838,9 +829,21 @@ pre code.hljs {
 /* Popup Field Editor */
 .field-popup-container {
 	position: absolute;
-	z-index: 10000;
 	min-width: 200px;
 	/*max-width: 500px;*/
+	/*transition: all 0.25s ease;*/
+	z-index: 9999;
+}
+
+.field-popup-maximized {
+	position: fixed !important;
+	top: 0 !important;
+	left: 0 !important;
+	width: 100vw !important;
+	height: 100vh !important;
+	margin: 0 !important;
+	border-radius: 0 !important;
+	transform: none !important;
 }
 
 .popup-field-editor {
@@ -903,19 +906,19 @@ td.auto-wrap .wrapper {
 }
 
 td.auto-wrap.no-line-break.full-width .wrapper {
-	width: 750px;
+	min-width: 750px;
 }
 
 td.auto-wrap.no-line-break.large-width .wrapper {
-	width: 500px;
+	min-width: 500px;
 }
 
 td.auto-wrap.no-line-break.medium-width .wrapper {
-	width: 300px;
+	min-width: 300px;
 }
 
 td.auto-wrap.no-line-break.small-width .wrapper {
-	width: 200px;
+	min-width: 200px;
 }
 
 td.auto-wrap.no-line-break pre {

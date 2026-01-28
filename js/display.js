@@ -522,34 +522,45 @@
 			popup.className = "field-popup-container";
 			popup.innerHTML = html;
 			document.body.appendChild(popup);
+			const maximizeBtn = document.getElementById("popup-maximize-btn");
+			if (maximizeBtn) {
+				maximizeBtn.addEventListener("click", (e) => {
+					e.preventDefault();
+					this.toggleMaximizePopup();
+				});
+			}
 
 			this.currentPopup = popup;
 			cell.classList.add("active");
 
 			// Create Popper instance
-			if (window.Popper) {
-				this.popperInstance = window.Popper.createPopper(cell, popup, {
-					placement: "bottom-start",
-					modifiers: [
-						{
-							name: "flip",
-							options: {
-								fallbackPlacements: [
-									"top-start",
-									"bottom-end",
-									"top-end",
-								],
-							},
+			this.popperInstance = window.Popper.createPopper(cell, popup, {
+				placement: "bottom-start",
+				modifiers: [
+					{
+						name: "offset",
+						options: {
+							offset: [
+								-(cell.offsetWidth / 2),
+								-(cell.offsetHeight / 2),
+							],
 						},
-						{
-							name: "preventOverflow",
-							options: {
-								padding: 8,
-							},
+					},
+					{
+						name: "preventOverflow",
+						options: {
+							padding: 0,
+							tether: false,
 						},
-					],
-				});
-			}
+					},
+					{
+						name: "flip",
+						options: {
+							fallbackPlacements: ["top-start"],
+						},
+					},
+				],
+			});
 
 			// Focus input
 			const inputs = popup.querySelectorAll(
@@ -582,8 +593,38 @@
 			popup.dataset.type = fieldType;
 			popup.dataset.keys = row.dataset.keys;
 
-			createSqlEditors(popup);
+			createSqlEditors(popup, { selected: true });
 			createDateAndTimePickers(popup);
+		},
+
+		toggleMaximizePopup() {
+			const popup = this.currentPopup;
+			if (!popup) return;
+
+			// Maximize
+			if (!popup.dataset.maximized) {
+				const rect = popup.getBoundingClientRect();
+
+				popup.classList.add("field-popup-maximized");
+				popup.dataset.maximized = "true";
+
+				// Pause Popper
+				if (this.popperInstance) {
+					this.popperInstance.disable();
+				}
+				return;
+			}
+
+			// Restore
+			popup.classList.remove("field-popup-maximized");
+
+			popup.dataset.maximized = "";
+
+			// Reactivate Popper
+			if (this.popperInstance) {
+				this.popperInstance.enable();
+				this.popperInstance.update();
+			}
 		},
 
 		saveAndClose() {

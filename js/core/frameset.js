@@ -484,7 +484,9 @@ function frameSetHandler(postCacheDB) {
 		stickyElements.forEach((el) => stickyHeaderContent.appendChild(el));
 
 		const updateHeaderBgWidth = () => {
-			stickyHeaderBg.style.width = content.scrollWidth - 2 + "px";
+			stickyHeaderBg.style.width = "100%";
+			stickyHeaderBg.style.width = content.scrollWidth - 3 + "px";
+			window.setTimeout(() => {});
 		};
 
 		window.addEventListener("resize", updateHeaderBgWidth);

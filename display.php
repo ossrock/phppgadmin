@@ -978,6 +978,8 @@ function popupEdit()
 		echo "<label class=\"mr-2\"><input type=\"checkbox\" name=\"_isnull\" id=\"popup-null-cb\" class=\"mr-1\"{$nullChecked}>" . htmlspecialchars($lang['strnull']) . "</label> ";
 	}
 	echo '<label><input type="checkbox" name="_isexpr" id="popup-expr-cb" class="mr-1"> ' . htmlspecialchars($lang['strexpression']) . '</label>';
+	// Todo: add a maximize button/icon
+	//echo '<button class="popup-maximize-btn" id="popup-maximize-btn">🗖</button>';
 	echo '</div>';
 	echo '</div>';
 
